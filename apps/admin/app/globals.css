@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Light Mode (Default) ──────────────────────────────── */
+:root {
+  --background: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-secondary: #F4F4F5;
+  --border: #E4E4E7;
+  --border-hover: #D4D4D8;
+  --text-primary: #09090B;
+  --text-secondary: #71717A;
+  --text-tertiary: #A1A1AA;
+  --brand: #2563EB;
+  --brand-hover: #1D4ED8;
+  --brand-light: #EFF6FF;
+  --brand-muted: #BFDBFE;
+  --success: #16A34A;
+  --success-light: #F0FDF4;
+  --warning: #EA580C;
+  --warning-light: #FFF7ED;
+  --error: #DC2626;
+  --error-light: #FEF2F2;
+
+  --gradient-brand: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+  --gradient-success: linear-gradient(135deg, #16A34A 0%, #0EA5E9 100%);
+  --gradient-premium: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+}
+
+/* ─── Dark Mode ─────────────────────────────────────────── */
+.dark {
+  --background: #09090B;
+  --surface: #18181B;
+  --surface-secondary: #27272A;
+  --border: #3F3F46;
+  --border-hover: #52525B;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --brand: #3B82F6;
+  --brand-hover: #60A5FA;
+  --brand-light: #172554;
+  --brand-muted: #1E3A5F;
+  --success: #22C55E;
+  --success-light: #052E16;
+  --warning: #F97316;
+  --warning-light: #431407;
+  --error: #EF4444;
+  --error-light: #450A0A;
+}
+
+/* ─── Base Styles ───────────────────────────────────────── */
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* ─── Skeleton Shimmer ──────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-secondary) 25%,
+    var(--border) 50%,
+    var(--surface-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ─── Focus Ring ────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
