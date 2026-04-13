@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { logger } from '../../utils/logger';
-import { redis } from '../../config/redis';
+import { redis, redisAvailable } from '../../config/redis';
 import { Offer } from '../../models/Offer';
 import { Driver } from '../../models/Driver';
 import { Order } from '../../models/Order';
@@ -59,13 +59,18 @@ async function handleCleanupExpiredOtps(data: CleanupExpiredOtpsJob): Promise<vo
   logger.info({ pattern }, 'Cleaning up expired OTP keys');
 
   try {
+    if (!redisAvailable || !redis) {
+      logger.warn('Redis unavailable, skipping OTP cleanup');
+      return;
+    }
     // Use SCAN to find all OTP keys
+    const r = redis!;
     let cursor = '0';
     let deletedCount = 0;
     const batchSize = 100;
 
     do {
-      const [nextCursor, keys] = await redis.scan(
+      const [nextCursor, keys] = await r.scan(
         cursor,
         'MATCH',
         pattern,
@@ -76,14 +81,10 @@ async function handleCleanupExpiredOtps(data: CleanupExpiredOtpsJob): Promise<vo
       cursor = nextCursor;
 
       if (keys.length > 0) {
-        // Check TTL for each key and delete if expired or has no TTL
         for (const key of keys) {
-          const ttl = await redis.ttl(key);
-          // If TTL is -1 (no expiry) or -2 (doesn't exist), we can skip
-          // If TTL is 0 or negative (other than -2), it's expired
+          const ttl = await r.ttl(key);
           if (ttl === -1) {
-            // Key exists but has no TTL, this shouldn't happen for OTPs
-            await redis.del(key);
+            await r.del(key);
             deletedCount++;
           }
         }
@@ -215,7 +216,7 @@ async function handleExpireDriverDocs(data: ExpireDriverDocsJob): Promise<void> 
         // Suspend driver until documents are updated
         await Driver.findByIdAndUpdate(driver._id, { isOnline: false, isVerified: false });
 
-        await queues.notifications.add('send-push', {
+        await queues.notifications?.add('send-push', {
           userId: driver.userId.toString(),
           title: 'Documents Expired',
           body: 'Your driver documents have expired. Please update them to continue accepting orders.',
@@ -230,7 +231,7 @@ async function handleExpireDriverDocs(data: ExpireDriverDocsJob): Promise<void> 
           'Driver has documents expiring soon'
         );
 
-        await queues.notifications.add('send-push', {
+        await queues.notifications?.add('send-push', {
           userId: driver.userId.toString(),
           title: 'Documents Expiring Soon',
           body: 'Your driver documents are expiring soon. Please update them to avoid service interruption.',

@@ -3,7 +3,7 @@ import { Driver } from '../../models/Driver';
 import { Order } from '../../models/Order';
 import { User } from '../../models/User';
 import { Transaction } from '../../models/Transaction';
-import { redis } from '../../config/redis';
+import { redis, redisAvailable } from '../../config/redis';
 import { sendOrderStatusNotification } from '../../services/notification.service';
 import { sendOrderStatusUpdate } from '../../services/email.service';
 import { uploadFile } from '../../services/storage.service';
@@ -73,7 +73,7 @@ export async function updateLocation(req: Request, res: Response): Promise<void>
   }
 
   // Cache in Redis for fast tracking reads
-  await redis.set(
+  if (redisAvailable && redis) await redis.set(
     `driver:location:${driver._id}`,
     JSON.stringify({
       coordinates: req.body.location.coordinates,

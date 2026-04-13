@@ -2,6 +2,7 @@ import { Queue, Worker, QueueOptions, WorkerOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { redisAvailable } from '../config/redis';
 
 // Queue names used throughout the application
 export const QUEUE_NAMES = {
@@ -22,25 +23,27 @@ function createRedisConnection(): IORedis {
   });
 }
 
-// Default queue options
-const defaultQueueOptions: QueueOptions = {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 2000,
+// Default queue options (connection created lazily)
+function getDefaultQueueOptions(): QueueOptions {
+  return {
+    connection: createRedisConnection(),
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+      removeOnComplete: {
+        count: 100,
+        age: 24 * 3600, // 24 hours
+      },
+      removeOnFail: {
+        count: 500,
+        age: 7 * 24 * 3600, // 7 days
+      },
     },
-    removeOnComplete: {
-      count: 100,
-      age: 24 * 3600, // 24 hours
-    },
-    removeOnFail: {
-      count: 500,
-      age: 7 * 24 * 3600, // 7 days
-    },
-  },
-};
+  };
+}
 
 // Default worker options
 const defaultWorkerOptions: Omit<WorkerOptions, 'connection'> = {
@@ -56,7 +59,7 @@ export function createQueue<T = any>(
   options?: Partial<QueueOptions>
 ): Queue<T> {
   const queue = new Queue<T>(queueName, {
-    ...defaultQueueOptions,
+    ...getDefaultQueueOptions(),
     ...options,
     connection: createRedisConnection(),
   });
@@ -111,12 +114,28 @@ export function createWorker<T = any>(
   return worker;
 }
 
-// Export queue instances for use across the application
-export const queues = {
-  notifications: createQueue(QUEUE_NAMES.NOTIFICATIONS),
-  payments: createQueue(QUEUE_NAMES.PAYMENTS),
-  driverAssignment: createQueue(QUEUE_NAMES.DRIVER_ASSIGNMENT),
-  reports: createQueue(QUEUE_NAMES.REPORTS),
-  maintenance: createQueue(QUEUE_NAMES.MAINTENANCE),
-  orderProcessing: createQueue(QUEUE_NAMES.ORDER_PROCESSING),
-};
+// Lazy queue instances — only created when Redis is available
+let _queues: Record<string, Queue> | null = null;
+
+export function getQueues() {
+  if (!redisAvailable) return null;
+  if (!_queues) {
+    _queues = {
+      notifications: createQueue(QUEUE_NAMES.NOTIFICATIONS),
+      payments: createQueue(QUEUE_NAMES.PAYMENTS),
+      driverAssignment: createQueue(QUEUE_NAMES.DRIVER_ASSIGNMENT),
+      reports: createQueue(QUEUE_NAMES.REPORTS),
+      maintenance: createQueue(QUEUE_NAMES.MAINTENANCE),
+      orderProcessing: createQueue(QUEUE_NAMES.ORDER_PROCESSING),
+    };
+  }
+  return _queues;
+}
+
+// Backwards-compatible export — returns null if Redis is unavailable
+export const queues = new Proxy({} as any, {
+  get(_target, prop: string) {
+    const q = getQueues();
+    return q ? q[prop] : null;
+  },
+});

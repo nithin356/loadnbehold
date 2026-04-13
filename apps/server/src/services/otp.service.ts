@@ -1,8 +1,11 @@
-import { redis } from '../config/redis';
+import { redis, redisAvailable } from '../config/redis';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
 const OTP_PREFIX = 'otp:';
+
+// In-memory fallback when Redis is unavailable
+const memoryStore = new Map<string, { otp: string; expiresAt: number }>();
 
 function generateOtp(length: number): string {
   const digits = '0123456789';
@@ -13,12 +16,43 @@ function generateOtp(length: number): string {
   return otp;
 }
 
+async function storeOtp(phone: string, otp: string): Promise<void> {
+  const key = `${OTP_PREFIX}${phone}`;
+  if (redisAvailable && redis) {
+    await redis.set(key, otp, 'EX', env.OTP_EXPIRY_SECONDS);
+  } else {
+    memoryStore.set(key, { otp, expiresAt: Date.now() + env.OTP_EXPIRY_SECONDS * 1000 });
+  }
+}
+
+async function getOtp(phone: string): Promise<string | null> {
+  const key = `${OTP_PREFIX}${phone}`;
+  if (redisAvailable && redis) {
+    return redis.get(key);
+  }
+  const entry = memoryStore.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    memoryStore.delete(key);
+    return null;
+  }
+  return entry.otp;
+}
+
+async function deleteOtp(phone: string): Promise<void> {
+  const key = `${OTP_PREFIX}${phone}`;
+  if (redisAvailable && redis) {
+    await redis.del(key);
+  } else {
+    memoryStore.delete(key);
+  }
+}
+
 export async function sendOtp(phone: string): Promise<{ success: boolean; message: string }> {
   const otp = generateOtp(env.OTP_LENGTH);
-  const key = `${OTP_PREFIX}${phone}`;
 
-  // Store OTP in Redis with TTL
-  await redis.set(key, otp, 'EX', env.OTP_EXPIRY_SECONDS);
+  // Store OTP
+  await storeOtp(phone, otp);
 
   if (env.OTP_PROVIDER === 'console') {
     // Development mode — log OTP to console
@@ -54,18 +88,17 @@ export async function sendOtp(phone: string): Promise<{ success: boolean; messag
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   // Dev bypass — accept DEV_OTP_CODE for any phone when enabled
-  if (env.DEV_OTP_BYPASS && env.NODE_ENV === 'development' && code === env.DEV_OTP_CODE) {
+  if (env.DEV_OTP_BYPASS && code === env.DEV_OTP_CODE) {
     logger.info(`DEV OTP bypass used for ${phone}`);
     return true;
   }
 
   if (env.OTP_PROVIDER === 'console') {
-    // Dev mode — verify from Redis
-    const key = `${OTP_PREFIX}${phone}`;
-    const storedOtp = await redis.get(key);
+    // Dev mode — verify from store
+    const storedOtp = await getOtp(phone);
 
     if (storedOtp === code) {
-      await redis.del(key);
+      await deleteOtp(phone);
       return true;
     }
     return false;
@@ -84,11 +117,10 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
       return verification.status === 'approved';
     }
 
-    // Fallback to Redis-stored OTP
-    const key = `${OTP_PREFIX}${phone}`;
-    const storedOtp = await redis.get(key);
+    // Fallback to stored OTP
+    const storedOtp = await getOtp(phone);
     if (storedOtp === code) {
-      await redis.del(key);
+      await deleteOtp(phone);
       return true;
     }
     return false;

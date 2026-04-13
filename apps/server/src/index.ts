@@ -4,7 +4,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { app } from './app';
 import { env } from './config/env';
 import { connectDatabase } from './config/database';
-import { connectRedis } from './config/redis';
+import { connectRedis, redisAvailable } from './config/redis';
 import { setupTrackingSocket } from './socket/tracking';
 import { pingGatewayHealth } from './config/payment';
 import { logger } from './utils/logger';
@@ -30,8 +30,12 @@ async function start() {
   await connectDatabase();
   await connectRedis();
 
-  // Initialize BullMQ job system
-  await initializeJobSystem();
+  // Initialize BullMQ job system (requires Redis)
+  if (redisAvailable) {
+    await initializeJobSystem();
+  } else {
+    logger.warn('⚠️ Job system skipped — Redis not available');
+  }
 
   // Payment gateway health check every 60 seconds
   setInterval(async () => {

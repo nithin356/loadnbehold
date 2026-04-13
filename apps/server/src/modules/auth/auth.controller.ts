@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../models/User';
 import { sendOtp as sendOtpService, verifyOtp as verifyOtpService } from '../../services/otp.service';
 import { env } from '../../config/env';
-import { redis } from '../../config/redis';
+import { redis, redisAvailable } from '../../config/redis';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
 import { sendWelcomeEmail } from '../../services/email.service';
 import { logger } from '../../utils/logger';
@@ -112,14 +112,15 @@ export async function refreshToken(req: Request, res: Response): Promise<void> {
     };
 
     // Check if token is blacklisted
-    const isBlacklisted = await redis.get(`blacklist:${payload.jti}`);
-    if (isBlacklisted) {
-      sendError(res, 'TOKEN_REVOKED', 'Refresh token has been revoked', 401);
-      return;
+    if (redisAvailable && redis) {
+      const isBlacklisted = await redis.get(`blacklist:${payload.jti}`);
+      if (isBlacklisted) {
+        sendError(res, 'TOKEN_REVOKED', 'Refresh token has been revoked', 401);
+        return;
+      }
+      // Blacklist old refresh token
+      await redis.set(`blacklist:${payload.jti}`, '1', 'EX', 30 * 24 * 60 * 60);
     }
-
-    // Blacklist old refresh token
-    await redis.set(`blacklist:${payload.jti}`, '1', 'EX', 30 * 24 * 60 * 60);
 
     const user = await User.findById(payload.userId);
     if (!user || user.isBlocked) {

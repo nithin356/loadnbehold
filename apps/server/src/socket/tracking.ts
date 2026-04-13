@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { redis } from '../config/redis';
+import { redis, redisAvailable } from '../config/redis';
 import { WS_EVENTS } from '@loadnbehold/constants';
 import { logger } from '../utils/logger';
 import jwt from 'jsonwebtoken';
@@ -37,7 +37,7 @@ export function setupTrackingSocket(io: Server): void {
       }
 
       // Cache in Redis
-      await redis.set(
+      if (redisAvailable && redis) await redis.set(
         `driver:location:${driverId}`,
         JSON.stringify({
           coordinates: location.coordinates,

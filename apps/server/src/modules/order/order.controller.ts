@@ -8,7 +8,7 @@ import { findOutletForAddress } from '../../services/geolocation.service';
 import { sendOrderStatusNotification } from '../../services/notification.service';
 import { sendOrderConfirmation } from '../../services/email.service';
 import { sendSuccess, sendError, sendPaginated } from '../../utils/apiResponse';
-import { redis } from '../../config/redis';
+import { redis, redisAvailable } from '../../config/redis';
 import { CANCELLATION_POLICY, ORDER_STATUS_LABELS, SERVICES as DEFAULT_SERVICES } from '@loadnbehold/constants';
 import { Service } from '../../models/Service';
 import { Driver } from '../../models/Driver';
@@ -410,7 +410,7 @@ export async function getTrackingData(req: Request, res: Response): Promise<void
     const d = order.driverId as any;
     const driverId = d._id;
 
-    const cached = await redis.get(`driver:location:${driverId}`);
+    const cached = (redisAvailable && redis) ? await redis.get(`driver:location:${driverId}`) : null;
     if (cached) {
       driverLocation = JSON.parse(cached);
     }
