@@ -203,7 +203,9 @@ export async function adjustOrderPrice(req: Request, res: Response): Promise<voi
   }
 
   if (subtotal !== undefined) {
-    const taxRate = 6.0;
+    const { AppConfig } = await import('../../models/AppConfig');
+    const appConfig = await AppConfig.findOne({ key: 'global' });
+    const taxRate = appConfig?.taxRate ?? 6.0;
     order.pricing.subtotal = subtotal;
     order.pricing.tax = parseFloat(((subtotal * taxRate) / 100).toFixed(2));
     order.pricing.total = parseFloat((subtotal + order.pricing.deliveryFee + order.pricing.tax - order.pricing.discount).toFixed(2));

@@ -147,12 +147,14 @@ export interface Outlet {
 // ─── Order Types ───────────────────────────────────────────
 export type OrderStatus =
   | 'placed'
+  | 'confirmed'
   | 'driver_assigned'
   | 'pickup_enroute'
   | 'picked_up'
   | 'at_laundry'
   | 'processing'
   | 'quality_check'
+  | 'ready_for_delivery'
   | 'out_for_delivery'
   | 'delivered'
   | 'cancelled';
@@ -164,6 +166,7 @@ export type PaymentGateway = 'stripe' | 'square' | 'paypal' | 'cod' | 'wallet';
 export type PaymentStatus =
   | 'pending'
   | 'paid'
+  | 'completed'
   | 'refunded'
   | 'failed'
   | 'cod_pending'

@@ -1,11 +1,18 @@
 import { Request, Response } from 'express';
 import { User } from '../../models/User';
+import { AppConfig } from '../../models/AppConfig';
 import { creditToWallet } from '../wallet/wallet.controller';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
 
-const REFERRAL_BONUS_REFERRER = 5;  // $5 for the referrer
-const REFERRAL_BONUS_REFEREE = 5;   // $5 for the new user
+async function getReferralConfig() {
+  const config = await AppConfig.findOne({ key: 'global' });
+  return {
+    referrerReward: config?.referral?.referrerReward ?? 5,
+    refereeDiscount: config?.referral?.refereeDiscount ?? 5,
+    maxReferralsPerUser: config?.referral?.maxReferralsPerUser ?? 50,
+  };
+}
 
 export async function getReferralCode(req: Request, res: Response): Promise<void> {
   try {
@@ -15,13 +22,14 @@ export async function getReferralCode(req: Request, res: Response): Promise<void
       return;
     }
 
+    const { referrerReward } = await getReferralConfig();
     const referralCount = await User.countDocuments({ referredBy: user.referralCode });
 
     sendSuccess(res, {
       code: user.referralCode,
       referralCount,
-      bonusPerReferral: REFERRAL_BONUS_REFERRER,
-      totalEarned: referralCount * REFERRAL_BONUS_REFERRER,
+      bonusPerReferral: referrerReward,
+      totalEarned: referralCount * referrerReward,
     });
   } catch (err: any) {
     logger.error({ err, userId: req.user?.userId }, 'Failed to get referral code');
@@ -61,15 +69,17 @@ export async function applyReferralCode(req: Request, res: Response): Promise<vo
       return;
     }
 
+    const { referrerReward, refereeDiscount } = await getReferralConfig();
+
     user.referredBy = code;
     await user.save();
 
-    await creditToWallet(userId, REFERRAL_BONUS_REFEREE, 'referral', `Welcome bonus from referral code ${code}`);
-    await creditToWallet(referrer._id.toString(), REFERRAL_BONUS_REFERRER, 'referral', `Referral bonus — ${user.phone} joined`);
+    await creditToWallet(userId, refereeDiscount, 'referral', `Welcome bonus from referral code ${code}`);
+    await creditToWallet(referrer._id.toString(), referrerReward, 'referral', `Referral bonus — ${user.phone} joined`);
 
     sendSuccess(res, {
-      bonusReceived: REFERRAL_BONUS_REFEREE,
-      message: `$${REFERRAL_BONUS_REFEREE} added to your wallet!`,
+      bonusReceived: refereeDiscount,
+      message: `$${refereeDiscount} added to your wallet!`,
     });
   } catch (err: any) {
     logger.error({ err, userId: req.user?.userId }, 'Failed to apply referral code');

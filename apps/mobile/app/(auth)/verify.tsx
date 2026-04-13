@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Button } from '@/components/Button';
 import { authApi } from '@/lib/api';
@@ -78,7 +78,11 @@ export default function VerifyScreen() {
       const result = await authApi.verifyOtp(phone!, finalCode);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       login(result.user, result.accessToken, result.refreshToken);
-      router.replace('/');
+      if (result.user.isNewUser) {
+        router.replace('/(auth)/role-select');
+      } else {
+        router.replace('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid OTP');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -140,11 +144,11 @@ export default function VerifyScreen() {
             ))}
           </View>
 
-          {error && (
+          {error ? (
             <Text style={{ color: c.error, fontSize: fontSize.sm, marginBottom: spacing.lg, textAlign: 'center' }}>
               {error}
             </Text>
-          )}
+          ) : null}
 
           <Button title="Verify" onPress={() => handleVerify()} loading={loading} fullWidth size="lg" />
 

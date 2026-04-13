@@ -144,24 +144,6 @@ export const zIndex = {
   tooltip: 80,
 } as const;
 
-// ─── Map Config ────────────────────────────────────────────
-export const mapConfig = {
-  light: {
-    style: 'mapbox://styles/mapbox/light-v11',
-    driverMarker: { color: '#2563EB', size: 14, pulse: true },
-    routeLine: { color: '#2563EB', width: 3, dashArray: [2, 4] },
-    pickupPin: { color: '#16A34A', icon: 'marker' },
-    deliveryPin: { color: '#DC2626', icon: 'marker' },
-  },
-  dark: {
-    style: 'mapbox://styles/mapbox/dark-v11',
-    driverMarker: { color: '#3B82F6', size: 14, pulse: true },
-    routeLine: { color: '#3B82F6', width: 3, dashArray: [2, 4] },
-    pickupPin: { color: '#22C55E', icon: 'marker' },
-    deliveryPin: { color: '#EF4444', icon: 'marker' },
-  },
-} as const;
-
 // ─── Tailwind Theme Extension (for tailwind.config) ────────
 export const tailwindThemeExtension = {
   colors: {

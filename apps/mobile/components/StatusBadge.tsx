@@ -37,7 +37,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         alignSelf: 'flex-start',
       }}
     >
-      <Text style={{ color: v.text, fontSize: fontSize.xs, fontWeight: '600', textTransform: 'capitalize' }}>
+      <Text style={{ color: v.text, fontSize: fontSize.xs, fontWeight: '600' }}>
         {label}
       </Text>
     </View>

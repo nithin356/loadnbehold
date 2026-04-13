@@ -42,12 +42,6 @@
         }
       ],
       [
-        "expo-haptics",
-        {
-          "enableHaptics": true
-        }
-      ],
-      [
         "@stripe/stripe-react-native",
         {
           "merchantIdentifier": "merchant.com.loadnbehold",

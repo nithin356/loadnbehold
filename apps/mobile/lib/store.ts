@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secure-store';
 
 // ─── Auth Store ────────────────────────────────
 interface AuthState {
@@ -29,7 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    if (user) SecureStore.setItemAsync('user', JSON.stringify(user));
+    set({ user });
+  },
 
   setTokens: (accessToken, refreshToken) => {
     SecureStore.setItemAsync('accessToken', accessToken);
@@ -162,4 +165,40 @@ export const useCartStore = create<CartState>((set, get) => ({
     }),
 
   getSubtotal: () => get().items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+}));
+
+// ─── Location Store ──────────────────────────
+interface SavedAddress {
+  _id: string;
+  label: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  zip: string;
+  location: { type: string; coordinates: [number, number] };
+}
+
+interface LocationState {
+  selectedAddress: SavedAddress | null;
+  currentCoords: { lat: number; lng: number } | null;
+  serviceable: boolean | null;
+  nearestOutlet: { name: string; distance: number; rating?: number; isOpen?: boolean } | null;
+  setSelectedAddress: (address: SavedAddress | null) => void;
+  setCurrentCoords: (coords: { lat: number; lng: number } | null) => void;
+  setServiceability: (serviceable: boolean | null, outlet?: LocationState['nearestOutlet']) => void;
+}
+
+export const useLocationStore = create<LocationState>((set) => ({
+  selectedAddress: null,
+  currentCoords: null,
+  serviceable: null,
+  nearestOutlet: null,
+
+  setSelectedAddress: (selectedAddress) => set({ selectedAddress }),
+
+  setCurrentCoords: (currentCoords) => set({ currentCoords }),
+
+  setServiceability: (serviceable, nearestOutlet) =>
+    set({ serviceable, ...(nearestOutlet !== undefined ? { nearestOutlet } : {}) }),
 }));

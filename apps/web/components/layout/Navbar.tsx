@@ -84,7 +84,8 @@ export function TopNav() {
       const res: any = await api.getNearbyOutlets(token, lat, lng);
       const outlets = res.data || [];
       if (outlets.length > 0) {
-        setServiceability(true, { name: outlets[0].name || outlets[0].outlet?.name, distance: outlets[0].distance });
+        const item = outlets[0];
+        setServiceability(true, { name: item.outlet?.name || item.name, distance: item.distance });
       } else {
         setServiceability(false, null);
       }

@@ -16,6 +16,7 @@ interface TrackingMapProps {
   outletLocation?: LatLng | null;
   orderStatus?: string;
   className?: string;
+  onEtaUpdate?: (etaMinutes: number | null) => void;
 }
 
 // ─── Custom Markers ─────────────────────────────────────────
@@ -52,19 +53,26 @@ const OUTLET_ICON = createIcon(
 );
 
 // ─── OSRM free routing ─────────────────────────────────────
-async function fetchRoute(from: LatLng, to: LatLng): Promise<L.LatLngExpression[]> {
+interface RouteResult {
+  coords: L.LatLngExpression[];
+  durationSeconds: number;
+}
+
+async function fetchRoute(from: LatLng, to: LatLng): Promise<RouteResult> {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
     const res = await fetch(url);
-    if (!res.ok) return [[from.lat, from.lng], [to.lat, to.lng]];
+    if (!res.ok) return { coords: [], durationSeconds: 0 };
     const data = await res.json();
-    const coords = data.routes?.[0]?.geometry?.coordinates;
-    if (!coords?.length) return [[from.lat, from.lng], [to.lat, to.lng]];
-    // GeoJSON is [lng, lat], Leaflet needs [lat, lng]
-    return coords.map((c: [number, number]) => [c[1], c[0]] as L.LatLngExpression);
+    const route = data.routes?.[0];
+    const coords = route?.geometry?.coordinates;
+    if (!coords?.length) return { coords: [], durationSeconds: 0 };
+    return {
+      coords: coords.map((c: [number, number]) => [c[1], c[0]] as L.LatLngExpression),
+      durationSeconds: route.duration || 0,
+    };
   } catch {
-    // Fallback: straight line
-    return [[from.lat, from.lng], [to.lat, to.lng]];
+    return { coords: [], durationSeconds: 0 };
   }
 }
 
@@ -96,7 +104,7 @@ function distanceMeters(a: LatLng, b: LatLng): number {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export default function TrackingMap({ driverLocation, pickupLocation, deliveryLocation, outletLocation, orderStatus, className }: TrackingMapProps) {
+export default function TrackingMap({ driverLocation, pickupLocation, deliveryLocation, outletLocation, orderStatus, className, onEtaUpdate }: TrackingMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
@@ -105,7 +113,7 @@ export default function TrackingMap({ driverLocation, pickupLocation, deliveryLo
   const outletMarkerRef = useRef<L.Marker | null>(null);
   const routeLinesRef = useRef<L.Polyline[]>([]);
   const hasFittedRef = useRef(false);
-  const routeCacheRef = useRef<Map<string, L.LatLngExpression[]>>(new Map());
+  const routeCacheRef = useRef<Map<string, RouteResult>>(new Map());
   const lastRouteDriverLocRef = useRef<LatLng | null>(null);
   const lastRouteStatusRef = useRef<string>('');
   const [mapReady, setMapReady] = useState(false);
@@ -129,10 +137,17 @@ export default function TrackingMap({ driverLocation, pickupLocation, deliveryLo
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
+    // Use first available location as default center, fallback to US center
+    const defaultCenter: [number, number] =
+      driverLocation ? [driverLocation.lat, driverLocation.lng] :
+      pickupLocation ? [pickupLocation.lat, pickupLocation.lng] :
+      deliveryLocation ? [deliveryLocation.lat, deliveryLocation.lng] :
+      [39.8283, -98.5795]; // Geographic center of US
+
     const map = L.map(mapRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView([42.3314, -83.0458], 13);
+    }).setView(defaultCenter, 13);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
@@ -144,6 +159,12 @@ export default function TrackingMap({ driverLocation, pickupLocation, deliveryLo
     setMapReady(true);
 
     return () => {
+      routeLinesRef.current.forEach((line) => line.remove());
+      routeLinesRef.current = [];
+      driverMarkerRef.current = null;
+      pickupMarkerRef.current = null;
+      deliveryMarkerRef.current = null;
+      outletMarkerRef.current = null;
       map.remove();
       mapInstanceRef.current = null;
       setMapReady(false);
@@ -292,24 +313,43 @@ export default function TrackingMap({ driverLocation, pickupLocation, deliveryLo
     }
 
     // Fetch and draw all routes
+    let cancelled = false;
     const drawRoutes = async () => {
+      let activeEtaSeconds = 0;
       for (const seg of segments) {
         const cache = routeCacheRef.current;
-        let routeCoords = cache.get(seg.key);
+        let result = cache.get(seg.key);
 
-        if (!routeCoords) {
-          routeCoords = await fetchRoute(seg.from, seg.to);
-          cache.set(seg.key, routeCoords);
+        if (!result) {
+          result = await fetchRoute(seg.from, seg.to);
+          if (cancelled || !mapInstanceRef.current) return;
+          if (cache.size > 50) {
+            const firstKey = cache.keys().next().value;
+            if (firstKey) cache.delete(firstKey);
+          }
+          cache.set(seg.key, result);
+        }
+
+        if (cancelled || !mapInstanceRef.current) return;
+
+        if (seg.active && result.durationSeconds > 0) {
+          activeEtaSeconds = result.durationSeconds;
         }
 
         const style = seg.active ? ACTIVE_ROUTE_STYLE : DIM_ROUTE_STYLE;
-        const line = L.polyline(routeCoords, style).addTo(map);
+        const line = L.polyline(result.coords, style).addTo(mapInstanceRef.current!);
         routeLinesRef.current.push(line);
+      }
+
+      if (onEtaUpdate) {
+        onEtaUpdate(activeEtaSeconds > 0 ? Math.ceil(activeEtaSeconds / 60) : null);
       }
     };
 
     drawRoutes();
-  }, [mapReady, driverLocation, pickupLocation, deliveryLocation, outletLocation, orderStatus]);
+
+    return () => { cancelled = true; };
+  }, [mapReady, driverLocation, pickupLocation, deliveryLocation, outletLocation, orderStatus, onEtaUpdate]);
 
   return (
     <div className={`relative ${className || ''}`} style={{ minHeight: '300px' }}>

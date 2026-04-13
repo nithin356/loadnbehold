@@ -431,6 +431,11 @@ export async function getTrackingData(req: Request, res: Response): Promise<void
     };
   }
 
+  const driverIdRaw = order.driverId;
+  const driverId = driverIdRaw
+    ? (typeof driverIdRaw === 'object' ? (driverIdRaw as any)._id?.toString() : String(driverIdRaw))
+    : null;
+
   sendSuccess(res, {
     orderId: order._id,
     orderNumber: order.orderNumber,
@@ -438,6 +443,7 @@ export async function getTrackingData(req: Request, res: Response): Promise<void
     timeline: order.timeline,
     driverLocation,
     driver,
+    driverId,
   });
 }
 

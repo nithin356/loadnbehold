@@ -1,12 +1,14 @@
 // ─── Order Status Flow ─────────────────────────────────────
 export const ORDER_STATUSES = [
   'placed',
+  'confirmed',
   'driver_assigned',
   'pickup_enroute',
   'picked_up',
   'at_laundry',
   'processing',
   'quality_check',
+  'ready_for_delivery',
   'out_for_delivery',
   'delivered',
   'cancelled',
@@ -14,12 +16,14 @@ export const ORDER_STATUSES = [
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   placed: 'Order Placed',
+  confirmed: 'Confirmed',
   driver_assigned: 'Driver Assigned',
   pickup_enroute: 'Pickup En Route',
   picked_up: 'Picked Up',
   at_laundry: 'At Laundry',
   processing: 'Processing',
   quality_check: 'Quality Check',
+  ready_for_delivery: 'Ready for Delivery',
   out_for_delivery: 'Out for Delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
@@ -27,12 +31,14 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
 
 export const ORDER_STATUS_BADGE_VARIANT: Record<string, string> = {
   placed: 'info',
+  confirmed: 'info',
   driver_assigned: 'info',
   pickup_enroute: 'warning',
   picked_up: 'warning',
   at_laundry: 'neutral',
   processing: 'neutral',
   quality_check: 'neutral',
+  ready_for_delivery: 'info',
   out_for_delivery: 'warning',
   delivered: 'success',
   cancelled: 'error',
@@ -52,7 +58,7 @@ export const SERVICES = [
 
 // ─── Payment ───────────────────────────────────────────────
 export const PAYMENT_METHODS = ['online', 'cod', 'wallet', 'split'] as const;
-export const PAYMENT_GATEWAYS = ['stripe', 'square', 'paypal'] as const;
+export const PAYMENT_GATEWAYS = ['stripe', 'square', 'paypal', 'cod', 'wallet'] as const;
 export const WALLET_TOPUP_AMOUNTS = [10, 25, 50, 100] as const;
 
 // ─── Admin Roles ───────────────────────────────────────────
@@ -80,12 +86,14 @@ export const DRIVER_ASSIGNMENT_WEIGHTS = {
 // ─── Cancellation Policy ───────────────────────────────────
 export const CANCELLATION_POLICY: Record<string, { allowed: boolean; refundPercent: number; fee: number }> = {
   placed: { allowed: true, refundPercent: 100, fee: 0 },
+  confirmed: { allowed: true, refundPercent: 100, fee: 0 },
   driver_assigned: { allowed: true, refundPercent: 100, fee: 0 },
   pickup_enroute: { allowed: true, refundPercent: 100, fee: 5.0 },
   picked_up: { allowed: false, refundPercent: 0, fee: 0 },
   at_laundry: { allowed: false, refundPercent: 0, fee: 0 },
   processing: { allowed: false, refundPercent: 0, fee: 0 },
   quality_check: { allowed: false, refundPercent: 0, fee: 0 },
+  ready_for_delivery: { allowed: false, refundPercent: 0, fee: 0 },
   out_for_delivery: { allowed: false, refundPercent: 0, fee: 0 },
   delivered: { allowed: false, refundPercent: 0, fee: 0 },
   cancelled: { allowed: false, refundPercent: 0, fee: 0 },

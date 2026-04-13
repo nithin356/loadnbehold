@@ -5,9 +5,10 @@ interface CardProps {
   children: React.ReactNode;
   style?: ViewStyle;
   padding?: number;
+  elevated?: boolean;
 }
 
-export function Card({ children, style, padding = spacing.lg }: CardProps) {
+export function Card({ children, style, padding = spacing.lg, elevated = true }: CardProps) {
   const c = useThemeColors();
 
   return (
@@ -19,6 +20,15 @@ export function Card({ children, style, padding = spacing.lg }: CardProps) {
           borderWidth: 1,
           borderColor: c.border,
           padding,
+          ...(elevated
+            ? {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.06,
+                shadowRadius: 4,
+                elevation: 2,
+              }
+            : {}),
         },
         style,
       ]}

@@ -13,6 +13,19 @@ import { toast } from 'sonner';
 
 const TrackingMap = lazy(() => import('@/components/TrackingMap'));
 
+function relativeTime(date: string | Date): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffSec = Math.floor((now - then) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
 interface Order {
   _id: string;
   orderNumber: string;
@@ -52,6 +65,7 @@ export default function TrackPage() {
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
 
   const fetchActiveOrders = useCallback(async () => {
     if (!token) return;
@@ -264,6 +278,7 @@ export default function TrackPage() {
                 outletLocation={outletLoc}
                 orderStatus={currentStatus}
                 className="h-[280px] sm:h-[400px] lg:h-[520px]"
+                onEtaUpdate={setEtaMinutes}
               />
             </Suspense>
             {/* Map legend */}
@@ -308,6 +323,11 @@ export default function TrackPage() {
                   {ORDER_STATUS_LABELS[currentStatus] || currentStatus}
                 </h2>
                 <p className="text-xs text-white/75 mt-0.5 leading-snug">{getStatusDescription()}</p>
+                {etaMinutes && isInTransit && (
+                  <p className="text-xs font-bold text-white/90 mt-1">
+                    ETA: ~{etaMinutes} min
+                  </p>
+                )}
               </div>
             </div>
           </motion.div>
@@ -410,7 +430,9 @@ export default function TrackPage() {
                           {ORDER_STATUS_LABELS[entry.status] || entry.status}
                         </p>
                         {entry.timestamp && (
-                          <p className="text-[10px] text-text-secondary">{new Date(entry.timestamp).toLocaleString()}</p>
+                          <p className="text-[10px] text-text-secondary" title={new Date(entry.timestamp).toLocaleString()}>
+                            {relativeTime(entry.timestamp)}
+                          </p>
                         )}
                       </div>
                     </div>

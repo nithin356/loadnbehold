@@ -1,16 +1,22 @@
 import { Request, Response } from 'express';
 import { User } from '../../models/User';
+import { AppConfig, ISubscriptionPlan } from '../../models/AppConfig';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
 
-const PLANS = [
-  { id: 'basic', name: 'Basic', price: 0, features: ['Standard delivery', 'Email support'], discount: 0, familySlots: 0 },
-  { id: 'plus', name: 'Plus', price: 9.99, features: ['Priority delivery', 'Free pickup', '10% off all services', 'Chat support', 'Family sharing (2 members)'], discount: 10, familySlots: 2 },
-  { id: 'premium', name: 'Premium', price: 29.99, features: ['Same-day delivery', 'Free pickup & delivery', '20% off all services', '24/7 phone support', 'Family sharing (5 members)'], discount: 20, familySlots: 5 },
-];
+async function getActivePlans(): Promise<ISubscriptionPlan[]> {
+  const config = await AppConfig.findOne({ key: 'global' }).lean();
+  return (config?.subscriptionPlans ?? []).filter((p) => p.isActive);
+}
 
 export async function getPlans(_req: Request, res: Response): Promise<void> {
-  sendSuccess(res, PLANS);
+  try {
+    const plans = await getActivePlans();
+    sendSuccess(res, plans);
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch subscription plans');
+    sendError(res, 'INTERNAL_ERROR', 'Failed to fetch plans', 500);
+  }
 }
 
 export async function subscribe(req: Request, res: Response): Promise<void> {
@@ -18,7 +24,8 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
     const { planId } = req.body;
     const userId = req.user!.userId;
 
-    const plan = PLANS.find((p) => p.id === planId);
+    const plans = await getActivePlans();
+    const plan = plans.find((p) => p.id === planId);
     if (!plan) {
       sendError(res, 'INVALID_PLAN', 'Plan not found', 400);
       return;
@@ -52,7 +59,7 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
       status: 'active',
       startDate,
       endDate,
-      discount: plan.discount,
+      discount: plan.discountPercent,
       familySlots: plan.familySlots
     }, `Subscribed to ${plan.name}`);
   } catch (err: any) {
@@ -96,7 +103,8 @@ export async function getCurrentSubscription(req: Request, res: Response): Promi
       return;
     }
 
-    const plan = PLANS.find((p) => p.id === user.subscription?.plan) || PLANS[0];
+    const plans = await getActivePlans();
+    const plan = plans.find((p) => p.id === user.subscription?.plan) || plans.find((p) => p.id === 'basic');
 
     sendSuccess(res, {
       ...plan,

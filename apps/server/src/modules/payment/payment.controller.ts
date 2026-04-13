@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import {
   createPaymentIntent, processRefund, capturePayPalOrder, completeSquarePayment,
   savePaymentMethodFromIntent, listSavedPaymentMethods, deleteSavedPaymentMethod,
@@ -13,7 +14,7 @@ import { Transaction } from '../../models/Transaction';
 
 // ─── Create Payment Intent ─────────────────────────────────
 export async function createIntent(req: Request, res: Response): Promise<void> {
-  const { orderId, amount, currency, saveCard, savedPaymentMethodId } = req.body;
+  const { orderId, currency, saveCard, savedPaymentMethodId } = req.body;
 
   const order = await Order.findById(orderId);
   if (!order) {
@@ -21,8 +22,17 @@ export async function createIntent(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // Security: verify order belongs to authenticated user
+  if (order.customerId.toString() !== req.user!.userId) {
+    sendError(res, 'FORBIDDEN', 'You do not have access to this order', 403);
+    return;
+  }
+
+  // Security: always use server-side order total, never trust client amount
+  const chargeAmount = order.pricing.total;
+
   const result = await createPaymentIntent(
-    amount || order.pricing.total,
+    chargeAmount,
     currency || 'usd',
     { orderId: order._id.toString(), orderNumber: order.orderNumber },
     { saveCard, savedPaymentMethodId, userId: req.user!.userId },
@@ -38,7 +48,7 @@ export async function createIntent(req: Request, res: Response): Promise<void> {
     orderId: order._id,
     customerId: req.user!.userId,
     type: 'charge',
-    amount: amount || order.pricing.total,
+    amount: chargeAmount,
     gateway: result.gateway,
     gatewayTransactionId: result.transactionId,
     status: result.gateway === 'paypal' ? 'pending' : 'completed',
@@ -146,8 +156,16 @@ export async function codCollect(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // Validate collected amount matches order total
+  if (amountCollected !== undefined && amountCollected !== order.pricing.total) {
+    logger.warn({ orderId, expected: order.pricing.total, collected: amountCollected }, 'COD amount mismatch');
+    sendError(res, 'AMOUNT_MISMATCH', `Expected $${order.pricing.total} but driver reported $${amountCollected}`, 400);
+    return;
+  }
+
   order.payment.codCollectedByDriver = true;
   order.payment.status = 'cod_collected';
+  order.payment.codAmount = order.pricing.total;
   await order.save();
 
   await Transaction.findOneAndUpdate(
@@ -155,7 +173,7 @@ export async function codCollect(req: Request, res: Response): Promise<void> {
     { status: 'completed' }
   );
 
-  sendSuccess(res, null, `Cash of $${amountCollected} collected`);
+  sendSuccess(res, null, `Cash of $${order.pricing.total} collected`);
 }
 
 // ─── COD: Deposit ─────────────────────────────────────────
@@ -243,6 +261,17 @@ export async function refund(req: Request, res: Response): Promise<void> {
 export async function capturePayPal(req: Request, res: Response): Promise<void> {
   const { paypalOrderId, orderId } = req.body;
 
+  // Verify order belongs to authenticated user
+  const order = await Order.findById(orderId);
+  if (!order) {
+    sendError(res, 'NOT_FOUND', 'Order not found', 404);
+    return;
+  }
+  if (order.customerId.toString() !== req.user!.userId) {
+    sendError(res, 'FORBIDDEN', 'You do not have access to this order', 403);
+    return;
+  }
+
   const result = await capturePayPalOrder(paypalOrderId);
 
   if (result.success) {
@@ -302,10 +331,18 @@ export async function stripeWebhook(req: Request, res: Response): Promise<void> 
         const walletUserId = pi.metadata?.userId;
 
         if (walletTopupAmount && walletUserId) {
-          // Wallet top-up — credit the user's wallet
+          // Wallet top-up — credit the user's wallet (with idempotency check)
           const { User: UserModel } = await import('../../models/User');
           const { WalletTransaction } = await import('../../models/Wallet');
           const amount = parseFloat(walletTopupAmount);
+
+          // Idempotency: skip if this payment intent already processed
+          const existingTxn = await WalletTransaction.findOne({ gatewayTransactionId: pi.id });
+          if (existingTxn) {
+            logger.info(`Stripe webhook: duplicate wallet top-up ignored for ${pi.id}`);
+            break;
+          }
+
           const user = await UserModel.findById(walletUserId);
           if (user) {
             user.walletBalance += amount;
@@ -363,16 +400,28 @@ export async function stripeWebhook(req: Request, res: Response): Promise<void> 
 
 // ─── Square Webhook ────────────────────────────────────────
 export async function squareWebhook(req: Request, res: Response): Promise<void> {
-  // Square webhook signature verification
   const signature = req.headers['x-square-hmacsha256-signature'] as string;
 
-  if (env.SQUARE_WEBHOOK_SIGNATURE_KEY && !signature) {
-    res.status(400).json({ error: 'Missing Square signature' });
-    return;
+  if (env.SQUARE_WEBHOOK_SIGNATURE_KEY) {
+    if (!signature) {
+      res.status(400).json({ error: 'Missing Square signature' });
+      return;
+    }
+    // Verify HMAC-SHA256 signature
+    const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    const notificationUrl = `${env.API_BASE_URL || ''}/api/v1/payments/webhook/square`;
+    const hmac = crypto.createHmac('sha256', env.SQUARE_WEBHOOK_SIGNATURE_KEY)
+      .update(notificationUrl + body)
+      .digest('base64');
+    if (hmac !== signature) {
+      logger.warn('Square webhook signature verification failed');
+      res.status(401).json({ error: 'Invalid signature' });
+      return;
+    }
+  } else {
+    logger.warn('SQUARE_WEBHOOK_SIGNATURE_KEY not configured — skipping verification');
   }
 
-  // In production, verify HMAC-SHA256 signature
-  // For now, process the event
   try {
     const event = req.body;
 
@@ -408,7 +457,26 @@ export async function squareWebhook(req: Request, res: Response): Promise<void> 
 
 // ─── PayPal Webhook ────────────────────────────────────────
 export async function paypalWebhook(req: Request, res: Response): Promise<void> {
-  // PayPal sends webhook notifications for order events
+  // Verify PayPal webhook signature
+  if (env.PAYPAL_WEBHOOK_ID) {
+    const transmissionId = req.headers['paypal-transmission-id'] as string;
+    const transmissionTime = req.headers['paypal-transmission-time'] as string;
+    const certUrl = req.headers['paypal-cert-url'] as string;
+    const transmissionSig = req.headers['paypal-transmission-sig'] as string;
+
+    if (!transmissionId || !transmissionTime || !transmissionSig) {
+      logger.warn('PayPal webhook missing required signature headers');
+      res.status(400).json({ error: 'Missing PayPal signature headers' });
+      return;
+    }
+
+    // In production, verify the signature by calling PayPal's verify-webhook-signature API
+    // For now, log that we received the required headers
+    logger.info({ transmissionId, certUrl }, 'PayPal webhook received with signature headers');
+  } else {
+    logger.warn('PAYPAL_WEBHOOK_ID not configured — skipping webhook verification');
+  }
+
   try {
     const event = req.body;
 

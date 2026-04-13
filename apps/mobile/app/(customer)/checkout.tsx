@@ -3,12 +3,34 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import * as Haptics from 'expo-haptics';
+import * as Location from '@/lib/location';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
+import { Skeleton, SkeletonRow } from '@/components/Skeleton';
 import { useCartStore } from '@/lib/store';
 import { customerApi, ordersApi, walletApi } from '@/lib/api';
 import { SERVICES } from '@loadnbehold/constants';
+
+const US_STATES: Record<string, string> = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+  'district of columbia': 'DC',
+};
+
+function toStateCode(state: string): string {
+  if (!state) return 'MI';
+  const trimmed = state.trim();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  return US_STATES[trimmed.toLowerCase()] || trimmed.slice(0, 2).toUpperCase();
+}
 
 const TIME_SLOTS = [
   '8:00 AM - 10:00 AM',
@@ -33,6 +55,14 @@ function getNextDays(count: number) {
 }
 
 const DATES = getNextDays(7);
+
+const STEP_CONFIG = [
+  { label: 'Cart', short: 'Cart', icon: 'cart-outline' },
+  { label: 'Address', short: 'Address', icon: 'location-outline' },
+  { label: 'Schedule', short: 'Schedule', icon: 'calendar-outline' },
+  { label: 'Payment', short: 'Pay', icon: 'card-outline' },
+  { label: 'Review', short: 'Review', icon: 'checkmark-circle-outline' },
+];
 
 export default function CheckoutScreen() {
   const c = useThemeColors();
@@ -71,9 +101,12 @@ export default function CheckoutScreen() {
   const loadInitialData = async () => {
     setLoading(true);
     try {
+      const coords = await Location.getLastKnownPositionAsync().catch(() => null);
+      const lat = coords?.coords.latitude ?? 0;
+      const lng = coords?.coords.longitude ?? 0;
       const [addrs, configRes, balRes] = await Promise.all([
         customerApi.getAddresses().catch(() => []),
-        customerApi.getNearbyOutlets(0, 0).catch(() => null),
+        customerApi.getNearbyOutlets(lat, lng).catch(() => null),
         walletApi.getBalance().catch(() => ({ balance: 0 })),
       ]);
       setSavedAddresses(Array.isArray(addrs) ? addrs : []);
@@ -108,9 +141,9 @@ export default function CheckoutScreen() {
           _id: 'current',
           label: 'Current Location',
           line1: [geo.streetNumber, geo.street].filter(Boolean).join(' ') || 'Detected Location',
-          city: geo.city || '',
-          state: geo.region || '',
-          zip: geo.postalCode || '',
+          city: geo.city || 'Detroit',
+          state: toStateCode(geo.region || ''),
+          zip: (geo.postalCode || '48201').replace(/[^\d-]/g, '').slice(0, 5),
           location: { type: 'Point', coordinates: [loc.coords.longitude, loc.coords.latitude] },
         };
         setSavedAddresses((prev) => {
@@ -142,32 +175,53 @@ export default function CheckoutScreen() {
     if (codRequired) setPaymentMethod('cod');
   }, [codRequired]);
 
+  const parseTimeSlot = (slot: string, date: string) => {
+    // "8:00 AM - 10:00 AM" → { date: "2026-04-13", from: "08:00", to: "10:00" }
+    const parts = slot.split(' - ');
+    const to24 = (t: string) => {
+      const [time, period] = t.trim().split(' ');
+      let [h, m] = time.split(':').map(Number);
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+    return { date, from: to24(parts[0]), to: to24(parts[1]) };
+  };
+
   const placeOrder = async () => {
     if (!selectedAddress) return;
     setPlacing(true);
     try {
-      const orderItems = items.map((item) => ({
-        service: item.service,
-        quantity: item.quantity,
-        weight: 1,
-        price: item.unitPrice,
-        name: item.label,
-      }));
+      const orderItems = items.map((item) => {
+        const svc = SERVICES.find((s) => s.key === item.service);
+        return {
+          service: item.service,
+          quantity: item.quantity,
+          weight: svc?.unit === 'lbs' ? item.quantity : undefined,
+          unit: (svc?.unit || 'items') as 'lbs' | 'kg' | 'items',
+        };
+      });
 
       const addressPayload = {
-        label: selectedAddress.label,
+        label: selectedAddress.label || 'Address',
         line1: selectedAddress.line1,
-        city: selectedAddress.city,
-        state: selectedAddress.state,
-        zip: selectedAddress.zip,
-        location: selectedAddress.location,
+        city: selectedAddress.city || 'Detroit',
+        state: toStateCode(selectedAddress.state || ''),
+        zip: (selectedAddress.zip || '48201').replace(/[^\d-]/g, '').slice(0, 5),
+        location: {
+          type: 'Point' as const,
+          coordinates: [
+            selectedAddress.location?.coordinates?.[0] ?? -83.0458,
+            selectedAddress.location?.coordinates?.[1] ?? 42.3314,
+          ] as [number, number],
+        },
       };
 
       const orderData = {
         items: orderItems,
         pickupAddress: addressPayload,
         deliveryAddress: addressPayload,
-        schedule: { pickupDate, pickupSlot, deliveryDate: pickupDate, deliverySlot: pickupSlot },
+        schedule: { pickupSlot: parseTimeSlot(pickupSlot, pickupDate) },
         paymentMethod,
         promoCode: promoCode.trim() || undefined,
         tip,
@@ -187,8 +241,14 @@ export default function CheckoutScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={c.brand} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+        <View style={{ padding: spacing.xl }}>
+          <Skeleton width={140} height={20} style={{ marginBottom: spacing.lg }} />
+          {[1, 2, 3].map((i) => (
+            <SkeletonRow key={i} style={{ marginBottom: spacing.sm }} />
+          ))}
+          <Skeleton width="100%" height={52} borderRadius={radius.xl} style={{ marginTop: spacing.xl }} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -204,21 +264,54 @@ export default function CheckoutScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: c.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
         <TouchableOpacity onPress={() => (step > 0 ? setStep(step - 1) : router.back())} style={{ marginRight: spacing.md }}>
           <Ionicons name="arrow-back" size={24} color={c.textPrimary} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: c.textPrimary }}>
-            {['Cart', 'Address', 'Schedule', 'Payment', 'Review'][step]}
-          </Text>
-          <Text style={{ fontSize: fontSize.xs, color: c.textTertiary }}>Step {step + 1} of 5</Text>
-        </View>
+        <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: c.textPrimary, flex: 1 }}>
+          {STEP_CONFIG[step].label}
+        </Text>
       </View>
 
-      {/* Progress Bar */}
-      <View style={{ height: 3, backgroundColor: c.border }}>
-        <View style={{ height: 3, backgroundColor: c.brand, width: `${((step + 1) / 5) * 100}%` }} />
+      {/* Stepper */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: c.border }}>
+        {STEP_CONFIG.map((s, idx) => {
+          const isCompleted = idx < step;
+          const isCurrent = idx === step;
+          const isLast = idx === STEP_CONFIG.length - 1;
+          return (
+            <View key={s.label} style={{ flex: 1, alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                {idx > 0 && (
+                  <View style={{ flex: 1, height: 2, backgroundColor: isCompleted || isCurrent ? c.brand : c.border }} />
+                )}
+                <View style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  backgroundColor: isCompleted ? c.brand : isCurrent ? c.brand : c.surfaceSecondary,
+                  borderWidth: isCurrent ? 0 : isCompleted ? 0 : 2,
+                  borderColor: c.border,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isCompleted ? (
+                    <Ionicons name="checkmark" size={14} color="#FFF" />
+                  ) : (
+                    <Ionicons name={s.icon as any} size={13} color={isCurrent ? '#FFF' : c.textTertiary} />
+                  )}
+                </View>
+                {!isLast && (
+                  <View style={{ flex: 1, height: 2, backgroundColor: isCompleted ? c.brand : c.border }} />
+                )}
+              </View>
+              <Text style={{
+                fontSize: 10, fontWeight: isCurrent ? '700' : '500',
+                color: isCompleted || isCurrent ? c.brand : c.textTertiary,
+                marginTop: 4,
+              }}>
+                {s.short}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl }} showsVerticalScrollIndicator={false}>
@@ -235,11 +328,11 @@ export default function CheckoutScreen() {
                   <Text style={{ fontSize: fontSize.xs, color: c.textSecondary }}>${item.unitPrice}/{SERVICES.find((s) => s.key === item.service)?.unit || 'item'}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <TouchableOpacity onPress={() => cart.updateQuantity(item.service, item.quantity - 1)} style={{ width: 30, height: 30, borderRadius: radius.md, backgroundColor: c.surfaceSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                  <TouchableOpacity onPress={() => cart.updateQuantity(item.service, item.quantity - 1)} accessibilityLabel={`Decrease quantity of ${item.label}`} accessibilityRole="button" style={{ width: 30, height: 30, borderRadius: radius.md, backgroundColor: c.surfaceSecondary, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="remove" size={16} color={c.textPrimary} />
                   </TouchableOpacity>
                   <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: c.textPrimary, minWidth: 20, textAlign: 'center' }}>{item.quantity}</Text>
-                  <TouchableOpacity onPress={() => cart.updateQuantity(item.service, item.quantity + 1)} style={{ width: 30, height: 30, borderRadius: radius.md, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }}>
+                  <TouchableOpacity onPress={() => cart.updateQuantity(item.service, item.quantity + 1)} accessibilityLabel={`Increase quantity of ${item.label}`} accessibilityRole="button" style={{ width: 30, height: 30, borderRadius: radius.md, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="add" size={16} color="#FFF" />
                   </TouchableOpacity>
                 </View>
@@ -264,7 +357,7 @@ export default function CheckoutScreen() {
         {/* ── Step 1: Address ── */}
         {step === 1 && (
           <View>
-            <TouchableOpacity onPress={useCurrentLocation} disabled={locLoading} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: c.brandLight, borderRadius: radius.lg, marginBottom: spacing.lg }}>
+            {Platform.OS !== 'web' && <TouchableOpacity onPress={useCurrentLocation} disabled={locLoading} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: c.brandLight, borderRadius: radius.lg, marginBottom: spacing.lg }}>
               {locLoading ? (
                 <ActivityIndicator size="small" color={c.brand} />
               ) : (
@@ -273,7 +366,7 @@ export default function CheckoutScreen() {
               <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: c.brand, marginLeft: spacing.sm }}>
                 {locLoading ? 'Detecting location...' : 'Use Current Location'}
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity>}
 
             {savedAddresses.length > 0 && (
               <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: c.textTertiary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm }}>
@@ -286,7 +379,7 @@ export default function CheckoutScreen() {
               return (
                 <TouchableOpacity
                   key={addr._id}
-                  onPress={() => setSelectedAddressIdx(idx)}
+                  onPress={() => { setSelectedAddressIdx(idx); Haptics.selectionAsync(); }}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: spacing.md,
                     backgroundColor: isSelected ? c.brandLight : c.surface,
@@ -331,7 +424,7 @@ export default function CheckoutScreen() {
                 return (
                   <TouchableOpacity
                     key={d.value}
-                    onPress={() => setPickupDate(d.value)}
+                    onPress={() => { setPickupDate(d.value); Haptics.selectionAsync(); }}
                     style={{
                       paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
                       borderRadius: radius.lg, borderWidth: 1.5, marginRight: spacing.sm,
@@ -351,7 +444,7 @@ export default function CheckoutScreen() {
               return (
                 <TouchableOpacity
                   key={slot}
-                  onPress={() => setPickupSlot(slot)}
+                  onPress={() => { setPickupSlot(slot); Haptics.selectionAsync(); }}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: spacing.md,
                     borderRadius: radius.lg, borderWidth: 1.5, marginBottom: spacing.sm,
@@ -393,7 +486,7 @@ export default function CheckoutScreen() {
               return (
                 <TouchableOpacity
                   key={method}
-                  onPress={() => !disabled && setPaymentMethod(method)}
+                  onPress={() => { if (!disabled) { setPaymentMethod(method); Haptics.selectionAsync(); } }}
                   disabled={disabled}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: spacing.md,
@@ -416,7 +509,7 @@ export default function CheckoutScreen() {
               {[0, 2, 5, 10].map((amt) => (
                 <TouchableOpacity
                   key={amt}
-                  onPress={() => setTip(amt)}
+                  onPress={() => { setTip(amt); Haptics.selectionAsync(); }}
                   style={{
                     flex: 1, height: 42, borderRadius: radius.lg, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
                     borderColor: tip === amt ? c.brand : c.border,
@@ -510,6 +603,8 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             onPress={() => setStep(step + 1)}
             disabled={!canProceed()}
+            accessibilityLabel={step === 3 ? 'Review Order' : `Continue to ${['Address', 'Schedule', 'Payment', 'Review'][step + 1] || 'next step'}`}
+            accessibilityRole="button"
             style={{
               height: 52, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center',
               backgroundColor: canProceed() ? c.brand : c.border,
@@ -523,6 +618,8 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             onPress={placeOrder}
             disabled={placing}
+            accessibilityLabel={`Place order for ${total.toFixed(2)} dollars`}
+            accessibilityRole="button"
             style={{
               height: 52, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center',
               backgroundColor: c.brand, opacity: placing ? 0.6 : 1,

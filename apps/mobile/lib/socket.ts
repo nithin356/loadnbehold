@@ -1,20 +1,28 @@
+import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from './store';
 
-const WS_URL = process.env.EXPO_PUBLIC_WS_BASE_URL || 'http://localhost:5000';
+const ENV_WS = process.env.EXPO_PUBLIC_WS_BASE_URL || 'http://localhost:5000';
+const WS_URL = Platform.OS === 'web' ? 'http://localhost:5001' : ENV_WS;
 
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    const token = useAuthStore.getState().accessToken;
     socket = io(WS_URL, {
-      auth: { token },
+      auth: { token: useAuthStore.getState().accessToken },
       transports: ['websocket'],
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
+    });
+
+    // Refresh auth token on each reconnect attempt
+    socket.on('reconnect_attempt', () => {
+      if (socket) {
+        socket.auth = { token: useAuthStore.getState().accessToken };
+      }
     });
   }
   return socket;
@@ -23,6 +31,8 @@ export function getSocket(): Socket {
 export function connectSocket(): void {
   const s = getSocket();
   if (!s.connected) {
+    // Always use latest token when connecting
+    s.auth = { token: useAuthStore.getState().accessToken };
     s.connect();
   }
 }

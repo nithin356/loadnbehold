@@ -146,6 +146,12 @@ export const api = {
   getTracking: (token: string, id: string) =>
     fetchApi(`/orders/${id}/track`, { token }),
 
+  reorder: (token: string, id: string) =>
+    fetchApi(`/orders/${id}/reorder`, { method: 'POST', token }),
+
+  dispute: (token: string, id: string, reason: string, photos?: string[]) =>
+    fetchApi(`/orders/${id}/dispute`, { method: 'POST', token, body: JSON.stringify({ reason, photos }) }),
+
   // Wallet
   getWalletBalance: (token: string) =>
     fetchApi('/wallet/balance', { token }),

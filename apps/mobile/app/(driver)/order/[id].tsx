@@ -1,14 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { driverApi } from '@/lib/api';
 import { ORDER_STATUS_LABELS } from '@loadnbehold/constants';
+
+function relativeTime(date: string | Date): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffSec = Math.floor((now - then) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return new Date(date).toLocaleDateString();
+}
 
 // Driver can advance order through these statuses
 const DRIVER_STATUS_FLOW: Record<string, { next: string; label: string; icon: string; color: string }> = {
@@ -30,7 +42,10 @@ export default function DriverOrderDetail() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadOrder = useCallback(async () => {
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
     try {
       // Use the orders list and find this one
       const orders = await driverApi.getOrders();
@@ -79,14 +94,33 @@ export default function DriverOrderDetail() {
   };
 
   const handleCall = (phone: string) => {
+    if (Platform.OS === 'web') return;
     Linking.openURL(`tel:${phone}`);
   };
 
-  const handleOpenMaps = (coords?: [number, number], label?: string) => {
+  const handleOpenMaps = async (coords?: [number, number], label?: string) => {
     if (!coords) return;
+    if (Platform.OS === 'web') return;
     const [lng, lat] = coords;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    Linking.openURL(url);
+    const encodedLabel = encodeURIComponent(label || 'Destination');
+
+    if (Platform.OS === 'ios') {
+      // Try Google Maps first, fall back to Apple Maps
+      const googleMapsUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
+      const appleMapsUrl = `maps://?daddr=${lat},${lng}&q=${encodedLabel}`;
+      const canOpenGoogle = await Linking.canOpenURL(googleMapsUrl).catch(() => false);
+      Linking.openURL(canOpenGoogle ? googleMapsUrl : appleMapsUrl);
+    } else {
+      // Android: geo: intent opens the system maps chooser (Google Maps, Waze, etc.)
+      const geoUrl = `geo:${lat},${lng}?q=${lat},${lng}(${encodedLabel})`;
+      const canOpenGeo = await Linking.canOpenURL(geoUrl).catch(() => false);
+      if (canOpenGeo) {
+        Linking.openURL(geoUrl);
+      } else {
+        // Fallback to Google Maps web URL (opens in browser → redirects to app)
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+      }
+    }
   };
 
   if (loading) {
@@ -187,19 +221,19 @@ export default function DriverOrderDetail() {
                 <Text style={{ fontSize: fontSize.base, fontWeight: '600', color: c.textPrimary }}>
                   {order.customerId?.name || 'Customer'}
                 </Text>
-                {customerPhone && (
+                {customerPhone ? (
                   <Text style={{ fontSize: fontSize.sm, color: c.textSecondary }}>{customerPhone}</Text>
-                )}
+                ) : null}
               </View>
             </View>
-            {customerPhone && (
+            {customerPhone ? (
               <TouchableOpacity
                 onPress={() => handleCall(customerPhone)}
                 style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: c.successLight, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Ionicons name="call" size={20} color={c.success} />
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
         </Card>
 
@@ -300,14 +334,14 @@ export default function DriverOrderDetail() {
         </Card>
 
         {/* Special Instructions */}
-        {order.pickupAddress?.instructions && (
+        {order.pickupAddress?.instructions ? (
           <Card style={{ marginBottom: spacing.lg }}>
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: c.textTertiary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.xs }}>
               Instructions
             </Text>
             <Text style={{ fontSize: fontSize.sm, color: c.textSecondary }}>{order.pickupAddress.instructions}</Text>
           </Card>
-        )}
+        ) : null}
 
         {/* Timeline */}
         <Card style={{ marginBottom: spacing.lg }}>
@@ -327,7 +361,7 @@ export default function DriverOrderDetail() {
                   {ORDER_STATUS_LABELS[entry.status] || entry.status}
                 </Text>
                 <Text style={{ fontSize: fontSize.xs, color: c.textSecondary }}>
-                  {new Date(entry.timestamp).toLocaleString()}
+                  {relativeTime(entry.timestamp)}
                 </Text>
               </View>
             </View>

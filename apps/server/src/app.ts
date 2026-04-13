@@ -28,7 +28,12 @@ const app: ReturnType<typeof express> = express();
 
 // ─── Global Middleware ─────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ALLOWED_ORIGINS.split(','), credentials: true }));
+app.use(cors({
+  origin: env.NODE_ENV === 'development'
+    ? (origin, cb) => cb(null, true)
+    : env.CORS_ALLOWED_ORIGINS.split(','),
+  credentials: true,
+}));
 
 // Stripe webhooks need raw body for signature verification
 app.use('/api/v1/payments/webhook/stripe', express.raw({ type: 'application/json' }));

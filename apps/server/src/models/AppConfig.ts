@@ -1,5 +1,16 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface ISubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  perks: string[];
+  discountPercent: number;
+  familySlots: number;
+  loyaltyMultiplier: number;
+  isActive: boolean;
+}
+
 export interface IAppConfig extends Document {
   key: 'global';
   serviceRadius: { default: number; unit: 'miles' | 'km' };
@@ -10,6 +21,7 @@ export interface IAppConfig extends Document {
   maxFutureScheduleDays: number;
   expressService: { enabled: boolean; surchargePercent: number };
   recurringOrders: boolean;
+  subscriptionPlans: ISubscriptionPlan[];
   payment: {
     primaryGateway: string;
     fallbackGateway: string;
@@ -65,6 +77,21 @@ const appConfigSchema = new Schema<IAppConfig>(
       surchargePercent: { type: Number, default: 50 },
     },
     recurringOrders: { type: Boolean, default: true },
+    subscriptionPlans: {
+      type: [
+        {
+          id: { type: String, required: true },
+          name: { type: String, required: true },
+          price: { type: Number, required: true },
+          perks: { type: [String], default: [] },
+          discountPercent: { type: Number, default: 0 },
+          familySlots: { type: Number, default: 0 },
+          loyaltyMultiplier: { type: Number, default: 1 },
+          isActive: { type: Boolean, default: true },
+        },
+      ],
+      default: [],
+    },
     payment: {
       primaryGateway: { type: String, default: 'stripe' },
       fallbackGateway: { type: String, default: 'square' },

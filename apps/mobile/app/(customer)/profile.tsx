@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, Share, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, Share, Modal, TextInput, ActivityIndicator, Appearance, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
 import { useAuthStore } from '@/lib/store';
@@ -26,6 +26,16 @@ export default function ProfileScreen() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const profile = await customerApi.getProfile();
+      if (profile && setUser) setUser(profile);
+    } catch {}
+    setRefreshing(false);
+  }, [setUser]);
 
   const openEditModal = () => {
     setEditName(user?.name || '');
@@ -70,13 +80,25 @@ export default function ProfileScreen() {
   };
 
   const handleReferral = async () => {
+    const msg = `Join LoadNBehold and get your laundry done! Use my referral link to sign up and we both earn $10. Download now: https://loadnbehold.com/invite`;
     try {
-      await Share.share({
-        message: `Join LoadNBehold and get your laundry done! Use my referral link to sign up and we both earn $10. Download now: https://loadnbehold.com/invite`,
-      });
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(msg);
+        Alert.alert('Copied', 'Referral link copied to clipboard.');
+      } else {
+        await Share.share({ message: msg });
+      }
     } catch {
       // user cancelled share
     }
+  };
+
+  const currentTheme = Appearance.getColorScheme() || 'light';
+
+  const cycleTheme = () => {
+    const next = currentTheme === 'light' ? 'dark' : 'light';
+    Appearance.setColorScheme(next);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const sections: { title: string; items: MenuItem[] }[] = [
@@ -91,8 +113,9 @@ export default function ProfileScreen() {
     {
       title: 'Preferences',
       items: [
-        { icon: 'notifications-outline', label: 'Notifications', subtitle: 'Push & SMS settings', onPress: () => Linking.openSettings() },
-        { icon: 'language-outline', label: 'Language', subtitle: 'English', onPress: () => Linking.openSettings() },
+        { icon: currentTheme === 'dark' ? 'moon' : 'sunny-outline', label: 'Appearance', subtitle: currentTheme === 'dark' ? 'Dark mode' : 'Light mode', onPress: cycleTheme },
+        { icon: 'notifications-outline', label: 'Notifications', subtitle: 'Push & SMS settings', onPress: () => Platform.OS !== 'web' && Linking.openSettings() },
+        { icon: 'language-outline', label: 'Language', subtitle: 'English', onPress: () => Platform.OS !== 'web' && Linking.openSettings() },
       ],
     },
     {
@@ -115,7 +138,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <View style={{ padding: spacing.xl }}>
           <Text style={{ fontSize: fontSize['2xl'], fontWeight: '700', color: c.textPrimary, marginBottom: spacing.xl }}>
             Profile
@@ -144,9 +167,9 @@ export default function ProfileScreen() {
                   {user?.name || 'User'}
                 </Text>
                 <Text style={{ fontSize: fontSize.sm, color: c.textSecondary }}>{user?.phone}</Text>
-                {user?.email && (
+                {user?.email ? (
                   <Text style={{ fontSize: fontSize.sm, color: c.textSecondary }}>{user.email}</Text>
-                )}
+                ) : null}
               </View>
               <TouchableOpacity onPress={openEditModal}>
                 <Ionicons name="create-outline" size={20} color={c.brand} />
@@ -201,11 +224,11 @@ export default function ProfileScreen() {
                       >
                         {item.label}
                       </Text>
-                      {item.subtitle && (
+                      {item.subtitle ? (
                         <Text style={{ fontSize: fontSize.xs, color: c.textTertiary, marginTop: 1 }}>
                           {item.subtitle}
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                     {!item.danger && <Ionicons name="chevron-forward" size={16} color={c.textTertiary} />}
                   </TouchableOpacity>
@@ -222,6 +245,7 @@ export default function ProfileScreen() {
 
       {/* Edit Profile Modal */}
       <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: c.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl }}>
             <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
@@ -291,6 +315,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

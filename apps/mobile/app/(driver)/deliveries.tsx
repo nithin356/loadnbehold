@@ -3,11 +3,14 @@ import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SkeletonCard } from '@/components/Skeleton';
 import { driverApi } from '@/lib/api';
-import { ORDER_STATUS_LABELS } from '@loadnbehold/constants';
+import { ORDER_STATUS_LABELS, WS_EVENTS } from '@loadnbehold/constants';
+import { getSocket } from '@/lib/socket';
 
 type Tab = 'active' | 'completed';
 
@@ -48,6 +51,24 @@ export default function DeliveriesScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Auto-refresh on socket events (new order assigned / status change)
+  useEffect(() => {
+    const socket = getSocket();
+    const handleNewOrder = () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      loadData();
+    };
+    const handleStatusChange = () => { loadData(); };
+
+    socket.on(WS_EVENTS.DRIVER_NEW_ORDER, handleNewOrder);
+    socket.on(WS_EVENTS.ORDER_STATUS, handleStatusChange);
+
+    return () => {
+      socket.off(WS_EVENTS.DRIVER_NEW_ORDER, handleNewOrder);
+      socket.off(WS_EVENTS.ORDER_STATUS, handleStatusChange);
+    };
+  }, [loadData]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
@@ -76,7 +97,7 @@ export default function DeliveriesScreen() {
           {(['active', 'completed'] as Tab[]).map((t) => (
             <TouchableOpacity
               key={t}
-              onPress={() => setTab(t)}
+              onPress={() => { setTab(t); Haptics.selectionAsync(); }}
               style={{
                 flex: 1,
                 paddingVertical: spacing.sm,
@@ -104,9 +125,10 @@ export default function DeliveriesScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.brand} />}
       >
         {loading ? (
-          <View style={{ alignItems: 'center', paddingVertical: spacing['4xl'] }}>
-            <Ionicons name="hourglass-outline" size={40} color={c.textTertiary} />
-            <Text style={{ color: c.textSecondary, marginTop: spacing.sm }}>Loading deliveries...</Text>
+          <View>
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} style={{ marginBottom: spacing.md }} />
+            ))}
           </View>
         ) : orders.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: spacing['4xl'] }}>

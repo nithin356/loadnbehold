@@ -2,12 +2,26 @@ import { Server, Socket } from 'socket.io';
 import { redis } from '../config/redis';
 import { WS_EVENTS } from '@loadnbehold/constants';
 import { logger } from '../utils/logger';
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
+
+function getSocketUserId(socket: Socket): string | null {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return null;
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { userId: string };
+    return decoded.userId;
+  } catch {
+    return null;
+  }
+}
 
 export function setupTrackingSocket(io: Server): void {
   io.on('connection', (socket: Socket) => {
-    logger.info(`Socket connected: ${socket.id}`);
+    const userId = getSocketUserId(socket);
+    logger.info(`Socket connected: ${socket.id} (user: ${userId || 'anonymous'})`);
 
-    // Driver sends location updates
+    // Driver sends location updates — verify identity
     socket.on(WS_EVENTS.DRIVER_LOCATION, async (data: {
       driverId: string;
       location: { type: 'Point'; coordinates: [number, number] };
@@ -15,6 +29,12 @@ export function setupTrackingSocket(io: Server): void {
       heading?: number;
     }) => {
       const { driverId, location, speed, heading } = data;
+
+      // Only allow drivers to send their own location
+      if (!userId || userId !== driverId) {
+        logger.warn({ socketId: socket.id, driverId, userId }, 'Unauthorized driver location update');
+        return;
+      }
 
       // Cache in Redis
       await redis.set(

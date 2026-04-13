@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Image, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Button } from '@/components/Button';

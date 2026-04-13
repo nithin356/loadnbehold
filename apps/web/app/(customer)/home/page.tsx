@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shirt, Sparkles, Flame, Droplets, Bed, ChevronRight, MapPin, Clock, Package, Star, Zap, ShieldCheck, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '@/lib/store';
+import { useAuthStore, useLocationStore } from '@/lib/store';
 import { api } from '@/lib/api';
 import { SERVICES } from '@loadnbehold/constants';
 
@@ -48,7 +48,7 @@ export default function HomePage() {
   const [banners, setBanners] = useState<any[]>(defaultBanners);
   const [offers, setOffers] = useState<any[]>([]);
   const [lastOrder, setLastOrder] = useState<any>(null);
-  const [nearestOutlet, setNearestOutlet] = useState<any>(null);
+  const { nearestOutlet: locationOutlet, serviceable } = useLocationStore();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -84,23 +84,8 @@ export default function HomePage() {
     }).catch(() => { toast.error('Failed to load recent orders'); });
   }, [token]);
 
-  // Fetch nearest outlet via geolocation
-  useEffect(() => {
-    if (!token) return;
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          api.getNearbyOutlets(token, pos.coords.longitude, pos.coords.latitude)
-            .then((res: any) => {
-              const outlets = res.data || [];
-              if (outlets.length > 0) setNearestOutlet(outlets[0]);
-            })
-            .catch(() => { /* outlet fetch failed — non-critical */ });
-        },
-        () => { /* geolocation denied — non-critical */ }
-      );
-    }
-  }, [token]);
+  // Nearest outlet comes from the location store (set by Navbar address selector)
+  const nearestOutlet = locationOutlet;
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -362,8 +347,14 @@ export default function HomePage() {
               </div>
             ) : (
               <div>
-                <p className="font-bold text-sm text-text-primary">Finding your nearest outlet...</p>
-                <p className="text-xs text-text-secondary mt-1">Allow location access to see nearby outlets</p>
+                <p className="font-bold text-sm text-text-primary">
+                  {serviceable === null ? 'Finding your nearest outlet...' : 'No outlets nearby'}
+                </p>
+                <p className="text-xs text-text-secondary mt-1">
+                  {serviceable === null
+                    ? 'Select an address from the top bar'
+                    : 'We don\u2019t have an outlet in your area yet'}
+                </p>
               </div>
             )}
           </div>

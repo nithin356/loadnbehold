@@ -19,6 +19,8 @@ export function validate(schema: ZodSchema, source: RequestPart = 'body') {
           details[path].push(issue.message);
         }
 
+        console.error('[VALIDATION_ERROR]', req.method, req.path, JSON.stringify(details, null, 2));
+        console.error('[VALIDATION_BODY]', JSON.stringify(req.body, null, 2).slice(0, 2000));
         sendError(res, 'VALIDATION_ERROR', 'Invalid request data', 400, details);
         return;
       }

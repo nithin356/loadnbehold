@@ -3,8 +3,8 @@ import { View, Text, ScrollView, Switch, TouchableOpacity, Alert, RefreshControl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
+import * as Haptics from '@/lib/haptics';
+import * as Location from '@/lib/location';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';

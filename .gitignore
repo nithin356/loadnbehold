@@ -3,8 +3,8 @@ dist/
 .next/
 .turbo/
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.log
 .DS_Store
 coverage/
@@ -12,4 +12,5 @@ coverage/
 *firebase-adminsdk*
 *serviceAccountKey*
 *firebase-service-account*
+google-services.json
 api data.txt

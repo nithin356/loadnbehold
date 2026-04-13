@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform, Linking, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { useConfirmPayment } from '@stripe/stripe-react-native';
+import * as Haptics from '@/lib/haptics';
+import { useConfirmPayment } from '@/lib/stripe';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
+import { WalletSkeleton } from '@/components/Skeleton';
 import { walletApi, paymentApi } from '@/lib/api';
 import { WALLET_TOPUP_AMOUNTS } from '@loadnbehold/constants';
 
@@ -28,6 +29,7 @@ export default function WalletScreen() {
   const [topUpLoading, setTopUpLoading] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -150,8 +152,8 @@ export default function WalletScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={c.brand} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+        <WalletSkeleton />
       </SafeAreaView>
     );
   }
@@ -161,7 +163,17 @@ export default function WalletScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => { setRefreshing(true); await loadData(); setRefreshing(false); }}
+              tintColor={c.brand}
+              colors={[c.brand]}
+            />
+          }
+        >
           <View style={{ padding: spacing.xl }}>
             <Text style={{ fontSize: fontSize['2xl'], fontWeight: '700', color: c.textPrimary, marginBottom: spacing.xl }}>
               Wallet
@@ -198,7 +210,10 @@ export default function WalletScreen() {
                   onPress={() => {
                     setSelectedAmount(selectedAmount === amt ? null : amt);
                     setCustomAmount('');
+                    Haptics.selectionAsync();
                   }}
+                  accessibilityLabel={`Add ${amt} dollars to wallet`}
+                  accessibilityRole="button"
                   style={{
                     flex: 1,
                     height: 44,
@@ -262,7 +277,7 @@ export default function WalletScreen() {
                   return (
                     <View key={method._id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
                       <TouchableOpacity
-                        onPress={() => setSelectedMethodId(isSelected ? null : method._id)}
+                        onPress={() => { setSelectedMethodId(isSelected ? null : method._id); Haptics.selectionAsync(); }}
                         style={{
                           flex: 1,
                           flexDirection: 'row',
@@ -324,6 +339,8 @@ export default function WalletScreen() {
             <TouchableOpacity
               onPress={handleTopUp}
               disabled={topUpLoading || !topUpAmount}
+              accessibilityLabel={topUpAmount ? `Add ${topUpAmount.toFixed(2)} dollars to wallet` : 'Select an amount to add'}
+              accessibilityRole="button"
               style={{
                 height: 52,
                 borderRadius: radius.xl,

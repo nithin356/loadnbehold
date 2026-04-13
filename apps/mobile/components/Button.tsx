@@ -1,5 +1,5 @@
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, radius, fontSize, spacing } from '@/lib/theme';
 
 interface ButtonProps {

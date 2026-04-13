@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Load environment-specific .env file, then fall back to .env
+const nodeEnv = process.env.NODE_ENV || 'development';
+if (nodeEnv === 'production') {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.production') });
+}
+dotenv.config(); // .env as fallback (won't overwrite already-set vars)
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -51,12 +57,10 @@ const envSchema = z.object({
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_CLIENT_SECRET: z.string().optional(),
   PAYPAL_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
+  PAYPAL_WEBHOOK_ID: z.string().optional(),
 
-  // Maps
-  MAPBOX_ACCESS_TOKEN: z.string().optional(),
-
-  // Stripe publishable key (for client-side)
-  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  // App
+  API_BASE_URL: z.string().optional(),
 
   // Firebase
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().default('./src/config/firebase-service-account.json'),
@@ -73,7 +77,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
 
   // CORS
-  CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3001'),
+  CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3001,http://localhost:8081,http://localhost:8082'),
 
   // Rate limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),

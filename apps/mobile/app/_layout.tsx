@@ -2,12 +2,15 @@ import { useEffect, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import * as Notifications from '@/lib/notifications';
+import * as Device from '@/lib/device';
+import { StripeProvider } from '@/lib/stripe';
 import { useAuthStore } from '@/lib/store';
 import { customerApi } from '@/lib/api';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { router } from 'expo-router';
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
@@ -18,6 +21,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -56,8 +61,8 @@ export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const isLoading = useAuthStore((s) => s.isLoading);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   useEffect(() => {
     hydrate().finally(() => {
@@ -77,27 +82,41 @@ export default function RootLayout() {
       // notification received in foreground — handler above shows alert
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
-      // user tapped notification — could navigate based on data
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.orderId) {
+        const role = useAuthStore.getState().user?.role;
+        if (role === 'driver') {
+          router.push(`/(driver)/order/${data.orderId}`);
+        } else {
+          router.push({ pathname: '/(customer)/track', params: { orderId: data.orderId as string } });
+        }
+      } else if (data?.screen) {
+        router.push(data.screen as any);
+      }
     });
 
     return () => {
-      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current);
-      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
+      if (notificationListener.current) notificationListener.current.remove();
+      if (responseListener.current) responseListener.current.remove();
     };
   }, [isAuthenticated]);
 
   if (isLoading) return null;
 
   return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.loadnbehold">
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(customer)" />
-        <Stack.Screen name="(driver)" />
-        <Stack.Screen name="index" />
-      </Stack>
-    </StripeProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.loadnbehold">
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(customer)" />
+            <Stack.Screen name="(driver)" />
+            <Stack.Screen name="index" />
+          </Stack>
+        </StripeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

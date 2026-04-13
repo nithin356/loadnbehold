@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import * as ctrl from './payment.controller';
 import { authenticate } from '../../middleware/auth';
+import { requireRole } from '../../middleware/roleGuard';
 import { validate } from '../../middleware/validator';
-import { createPaymentIntentSchema } from '@loadnbehold/validators';
+import { createPaymentIntentSchema, codCollectSchema } from '@loadnbehold/validators';
 
 const router: Router = Router();
 
@@ -10,10 +11,10 @@ const router: Router = Router();
 router.post('/create-intent', authenticate, validate(createPaymentIntentSchema), ctrl.createIntent);
 router.post('/confirm', authenticate, ctrl.confirmPayment);
 router.post('/cod/place', authenticate, ctrl.codPlace);
-router.post('/cod/collect', authenticate, ctrl.codCollect);
-router.post('/cod/deposit', authenticate, ctrl.codDeposit);
+router.post('/cod/collect', authenticate, requireRole('driver'), validate(codCollectSchema), ctrl.codCollect);
+router.post('/cod/deposit', authenticate, requireRole('driver'), ctrl.codDeposit);
 router.get('/cod/ledger', authenticate, ctrl.codLedger);
-router.post('/refund', authenticate, ctrl.refund);
+router.post('/refund', authenticate, requireRole('admin'), ctrl.refund);
 router.post('/paypal/capture', authenticate, ctrl.capturePayPal);
 router.post('/square/complete', authenticate, ctrl.completeSquare);
 

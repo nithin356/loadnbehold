@@ -3,7 +3,7 @@ import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, Activity
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { supportApi } from '@/lib/api';
 
@@ -264,7 +264,7 @@ export default function SupportScreen() {
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
             key={cat.value}
-            onPress={() => setCategory(cat.value)}
+            onPress={() => { setCategory(cat.value); Haptics.selectionAsync(); }}
             style={{
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
@@ -329,13 +329,13 @@ export default function SupportScreen() {
           borderRadius: radius.lg,
           paddingVertical: spacing.md,
           alignItems: 'center',
-          opacity: creating ? 0.5 : 1,
+          opacity: creating ? 0.6 : 1,
         }}
       >
         {creating ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '700' }}>Submit Ticket</Text>
+          <Text style={{ color: '#fff', fontSize: fontSize.base, fontWeight: '700' }}>Submit Ticket</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

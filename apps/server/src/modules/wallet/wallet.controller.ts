@@ -38,45 +38,32 @@ export async function topUp(req: Request, res: Response): Promise<void> {
 
     const gatewayChain = getGatewayChain();
 
-    if (gatewayChain.length > 0) {
-      const result = await createPaymentIntent(
-        amount,
-        'usd',
-        { userId, purpose: 'wallet_topup', walletTopupAmount: String(amount) },
-        { userId, savedPaymentMethodId, saveCard },
-      );
-
-      if (result.success) {
-        sendSuccess(res, {
-          clientSecret: result.clientSecret,
-          approvalUrl: result.approvalUrl,
-          gateway: result.gateway,
-          transactionId: result.transactionId,
-          amount,
-          requiresConfirmation: true,
-        }, 'Confirm payment to complete top-up');
-        return;
-      }
-
-      logger.warn({ userId, amount, error: result.error }, 'Payment gateway failed for wallet top-up, falling back to direct credit');
+    if (gatewayChain.length === 0) {
+      sendError(res, 'NO_GATEWAY', 'No payment gateway configured', 503);
+      return;
     }
 
-    user.walletBalance += amount;
-    await user.save();
-
-    await WalletTransaction.create({
-      userId,
-      type: 'topup',
+    const result = await createPaymentIntent(
       amount,
-      balance: user.walletBalance,
-      description: `Wallet top-up of $${amount}`,
-    });
+      'usd',
+      { userId, purpose: 'wallet_topup', walletTopupAmount: String(amount) },
+      { userId, savedPaymentMethodId, saveCard },
+    );
+
+    if (!result.success) {
+      logger.warn({ userId, amount, error: result.error }, 'Payment gateway failed for wallet top-up');
+      sendError(res, 'PAYMENT_FAILED', 'Payment gateway unavailable. Please try again.', 502);
+      return;
+    }
 
     sendSuccess(res, {
-      balance: user.walletBalance,
+      clientSecret: result.clientSecret,
+      approvalUrl: result.approvalUrl,
+      gateway: result.gateway,
+      transactionId: result.transactionId,
       amount,
-      requiresConfirmation: false,
-    }, `$${amount} added to wallet`);
+      requiresConfirmation: true,
+    }, 'Confirm payment to complete top-up');
   } catch (err: any) {
     logger.error({ err, userId: req.user?.userId }, 'Wallet top-up failed');
     sendError(res, 'INTERNAL_ERROR', 'Failed to process top-up', 500);
@@ -86,8 +73,29 @@ export async function topUp(req: Request, res: Response): Promise<void> {
 // Called after Stripe confirms payment (via webhook or client confirmation)
 export async function confirmTopUp(req: Request, res: Response): Promise<void> {
   try {
-    const { paymentIntentId, amount } = req.body;
+    const { paymentIntentId } = req.body;
     const userId = req.user!.userId;
+
+    // Idempotency: check if this payment intent was already processed
+    const existingTxn = await WalletTransaction.findOne({ gatewayTransactionId: paymentIntentId });
+    if (existingTxn) {
+      const user = await User.findById(userId).select('walletBalance');
+      sendSuccess(res, { balance: user?.walletBalance ?? 0 }, 'Top-up already processed');
+      return;
+    }
+
+    // Verify payment amount from Stripe instead of trusting client
+    const { getStripe } = await import('../../config/payment');
+    const stripe = getStripe();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      sendError(res, 'PAYMENT_NOT_CONFIRMED', `Payment status: ${paymentIntent.status}`, 400);
+      return;
+    }
+
+    // Use the verified amount from Stripe (convert from cents to dollars)
+    const amount = paymentIntent.amount / 100;
 
     const user = await User.findById(userId);
     if (!user) {

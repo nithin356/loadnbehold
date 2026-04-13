@@ -123,8 +123,8 @@ const orderSchema = new Schema<IOrder>(
     status: {
       type: String,
       enum: [
-        'placed', 'driver_assigned', 'pickup_enroute', 'picked_up',
-        'at_laundry', 'processing', 'quality_check',
+        'placed', 'confirmed', 'driver_assigned', 'pickup_enroute', 'picked_up',
+        'at_laundry', 'processing', 'quality_check', 'ready_for_delivery',
         'out_for_delivery', 'delivered', 'cancelled',
       ],
       default: 'placed',
