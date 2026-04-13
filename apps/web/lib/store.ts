@@ -61,10 +61,10 @@ interface LocationState {
   selectedAddress: SavedAddress | null;
   currentCoords: { lat: number; lng: number } | null;
   serviceable: boolean | null; // null = not checked yet
-  nearestOutlet: { name: string; distance: number } | null;
+  nearestOutlet: { name: string; distance: number; rating?: number } | null;
   setSelectedAddress: (addr: SavedAddress | null) => void;
   setCurrentCoords: (coords: { lat: number; lng: number } | null) => void;
-  setServiceability: (serviceable: boolean, outlet?: { name: string; distance: number } | null) => void;
+  setServiceability: (serviceable: boolean, outlet?: { name: string; distance: number; rating?: number } | null) => void;
 }
 
 export const useLocationStore = create<LocationState>()(
