@@ -314,7 +314,7 @@ function OrderFlowInner() {
   };
 
   return (
-    <div className="py-6 max-w-2xl mx-auto">
+    <div className="py-6 max-w-2xl mx-auto overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} className="p-2 rounded-full hover:bg-surface-secondary text-text-secondary hover:text-text-primary transition-colors">
@@ -416,7 +416,7 @@ function OrderFlowInner() {
               {/* Quick-select date chips */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-2">Pickup Date</label>
-                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
                   {(() => {
                     const chips: { label: string; value: string }[] = [];
                     for (let d = 0; d < 7; d++) {
@@ -456,13 +456,13 @@ function OrderFlowInner() {
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-2">Pickup Window</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <span className="block text-xs text-text-tertiary mb-1">From</span>
-                    <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-12 px-3 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                    <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-12 px-2 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="block text-xs text-text-tertiary mb-1">To</span>
-                    <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-12 px-3 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                    <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-12 px-2 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
                   </div>
                 </div>
               </div>
