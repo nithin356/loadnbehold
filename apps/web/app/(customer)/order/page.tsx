@@ -412,8 +412,37 @@ function OrderFlowInner() {
                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2"><Calendar className="w-5 h-5 text-brand" /> Schedule Pickup</h2>
                 <p className="text-sm text-text-secondary">When should we pick up your laundry?</p>
               </div>
+
+              {/* Quick-select date chips */}
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">Pickup Date</label>
+                <label className="block text-sm font-medium text-text-primary mb-2">Pickup Date</label>
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
+                  {(() => {
+                    const chips: { label: string; value: string }[] = [];
+                    for (let d = 0; d < 7; d++) {
+                      const date = new Date();
+                      date.setDate(date.getDate() + d);
+                      const value = date.toISOString().split('T')[0];
+                      const label = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                      chips.push({ label, value });
+                    }
+                    return chips.map((chip) => (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        onClick={() => setSchedule({ ...schedule, date: chip.value })}
+                        className={cn(
+                          'flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border',
+                          schedule.date === chip.value
+                            ? 'bg-brand text-white border-brand shadow-brand'
+                            : 'bg-surface border-border text-text-primary hover:border-brand/40'
+                        )}
+                      >
+                        {chip.label}
+                      </button>
+                    ));
+                  })()}
+                </div>
                 <input
                   type="date"
                   value={schedule.date}
@@ -422,16 +451,38 @@ function OrderFlowInner() {
                   className="w-full h-12 px-4 bg-surface border border-border rounded-xl text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">From</label>
-                  <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-12 px-4 bg-surface border border-border rounded-xl text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">To</label>
-                  <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-12 px-4 bg-surface border border-border rounded-xl text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+
+              {/* Time slot */}
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Pickup Window</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="block text-xs text-text-tertiary mb-1">From</span>
+                    <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-12 px-3 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                  </div>
+                  <div>
+                    <span className="block text-xs text-text-tertiary mb-1">To</span>
+                    <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-12 px-3 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                  </div>
                 </div>
               </div>
+
+              {/* Summary card */}
+              {schedule.date && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-brand-light/50 border border-brand/20 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text-primary">
+                        {new Date(schedule.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-text-secondary">{schedule.from} &ndash; {schedule.to}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
           )}
 
