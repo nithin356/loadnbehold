@@ -115,9 +115,10 @@ describe('Auth API', () => {
 
     it('should return error for invalid OTP', async () => {
       // Temporarily override the mock to return wrong OTP
-      const { redis } = await import('../config/redis');
-      const originalGet = redis.get;
-      vi.mocked(redis.get).mockImplementation(((key: any) => {
+      const mod = await import('../config/redis');
+      const r = mod.redis as NonNullable<typeof mod.redis>;
+      const originalGet = r.get;
+      vi.mocked(r.get).mockImplementation(((key: any) => {
         const keyStr = String(key);
         if (keyStr.startsWith('otp:')) {
           return Promise.resolve('999999'); // Different OTP
@@ -137,7 +138,7 @@ describe('Auth API', () => {
       expect(response.body.error.code).toBe('INVALID_OTP');
 
       // Restore original mock
-      vi.mocked(redis.get).mockImplementation(originalGet as any);
+      vi.mocked(r.get).mockImplementation(originalGet as any);
     });
 
     it('should return validation error for missing fields', async () => {
