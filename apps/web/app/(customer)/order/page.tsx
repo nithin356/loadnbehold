@@ -280,6 +280,12 @@ function OrderFlowInner() {
   const handleSubmit = async () => {
     if (!token) { toast.error('Please log in'); return; }
     if (!agreedToTerms) { toast.error('Please agree to the Terms & Conditions'); return; }
+    // Re-validate schedule at submission time in case time has elapsed
+    if (!validateSchedule()) {
+      toast.error(scheduleError || 'Your pickup time is no longer valid. Please go back and update it.');
+      setStep(1);
+      return;
+    }
     setLoading(true);
     try {
       const orderData = {

@@ -190,6 +190,26 @@ export default function CheckoutScreen() {
 
   const placeOrder = async () => {
     if (!selectedAddress) return;
+
+    // Re-validate schedule at submission time
+    const today = new Date().toISOString().split('T')[0];
+    if (pickupDate < today) {
+      Alert.alert('Schedule Expired', 'Your pickup date is now in the past. Please go back and select a new date.');
+      setStep(2);
+      return;
+    }
+    if (pickupDate === today) {
+      const slot = parseTimeSlot(pickupSlot, pickupDate);
+      const [h, m] = slot.from.split(':').map(Number);
+      const slotStart = new Date();
+      slotStart.setHours(h, m, 0, 0);
+      if (slotStart <= new Date()) {
+        Alert.alert('Schedule Expired', 'Your selected pickup time has already passed. Please go back and pick a later slot.');
+        setStep(2);
+        return;
+      }
+    }
+
     setPlacing(true);
     try {
       const orderItems = items.map((item) => {

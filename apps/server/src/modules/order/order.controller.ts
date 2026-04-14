@@ -25,6 +25,18 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
   const userId = req.user!.userId;
   const { items, pickupAddress, deliveryAddress, schedule, paymentMethod, promoCode, tip: requestedTip } = req.body;
 
+  // Validate schedule is not in the past
+  if (schedule?.pickupSlot) {
+    const { date, from } = schedule.pickupSlot;
+    if (date && from) {
+      const pickupTime = new Date(`${date}T${from}:00`);
+      if (pickupTime < new Date()) {
+        sendError(res, 'SCHEDULE_PAST', 'Pickup time is in the past. Please select a future time.', 400);
+        return;
+      }
+    }
+  }
+
   // Find outlet for pickup address
   const coords = pickupAddress.location.coordinates;
   const outlet = await findOutletForAddress(coords[0], coords[1]);
