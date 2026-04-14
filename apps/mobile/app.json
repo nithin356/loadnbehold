@@ -29,7 +29,6 @@
         "backgroundColor": "#2563EB"
       },
       "package": "com.loadnbehold.app",
-      "googleServicesFile": "./apps/mobile/google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
