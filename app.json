@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "9e65bf26-c1fc-4e1c-bcba-1fd60b5d7afe"
+      }
+    },
+    "android": {
+      "package": "com.clytanapp.loadnbehold"
+    }
+  }
+}
