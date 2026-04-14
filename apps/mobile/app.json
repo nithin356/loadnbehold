@@ -29,7 +29,7 @@
         "backgroundColor": "#2563EB"
       },
       "package": "com.loadnbehold.app",
-      "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "./apps/mobile/google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -61,8 +61,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9e65bf26-c1fc-4e1c-bcba-1fd60b5d7afe"
+        "projectId": "03169fc1-74f0-4974-b332-b32e38724290"
       }
-    }
+    },
+    "owner": "clytanapp"
   }
 }
