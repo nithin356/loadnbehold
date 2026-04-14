@@ -327,23 +327,23 @@ function OrderFlowInner() {
       </div>
 
       {/* Compact Step Indicator — show first 5 steps only */}
-      <div className="flex items-center mb-8">
+      <div className="flex items-center mb-8 overflow-hidden">
         {STEPS.slice(0, 5).map((s, i) => (
-          <div key={s} className="flex items-center flex-1 last:flex-none">
-            <div className="flex items-center gap-1.5">
+          <div key={s} className="flex items-center flex-1 last:flex-none min-w-0">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <div className={cn(
-                'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all',
+                'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all flex-shrink-0',
                 i < step ? 'bg-success text-white' : i === step ? 'bg-brand text-white shadow-brand' : 'bg-surface-secondary text-text-tertiary'
               )}>
                 {i < step ? <Check className="w-3 h-3" /> : i + 1}
               </div>
               <span className={cn(
-                'text-[11px] font-medium hidden min-[400px]:inline',
+                'text-[11px] font-medium hidden sm:inline truncate',
                 i === step ? 'text-brand' : i < step ? 'text-success' : 'text-text-tertiary'
               )}>{s}</span>
             </div>
             {i < 4 && (
-              <div className={cn('flex-1 h-[2px] mx-2 rounded-full transition-colors', i < step ? 'bg-success' : 'bg-border')} />
+              <div className={cn('flex-1 h-[2px] mx-1 sm:mx-2 rounded-full transition-colors min-w-[8px]', i < step ? 'bg-success' : 'bg-border')} />
             )}
           </div>
         ))}
@@ -413,56 +413,69 @@ function OrderFlowInner() {
                 <p className="text-sm text-text-secondary">When should we pick up your laundry?</p>
               </div>
 
-              {/* Quick-select date chips */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">Pickup Date</label>
-                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-                  {(() => {
-                    const chips: { label: string; value: string }[] = [];
-                    for (let d = 0; d < 7; d++) {
-                      const date = new Date();
-                      date.setDate(date.getDate() + d);
-                      const value = date.toISOString().split('T')[0];
-                      const label = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                      chips.push({ label, value });
-                    }
-                    return chips.map((chip) => (
-                      <button
-                        key={chip.value}
-                        type="button"
-                        onClick={() => setSchedule({ ...schedule, date: chip.value })}
-                        className={cn(
-                          'flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border',
-                          schedule.date === chip.value
-                            ? 'bg-brand text-white border-brand shadow-brand'
-                            : 'bg-surface border-border text-text-primary hover:border-brand/40'
-                        )}
-                      >
-                        {chip.label}
-                      </button>
-                    ));
-                  })()}
-                </div>
-                <input
-                  type="date"
-                  value={schedule.date}
-                  min={new Date().toISOString().split('T')[0]}
-                  onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
-                  className="w-full h-12 px-4 bg-surface border border-border rounded-xl text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all"
-                />
-              </div>
-
-              {/* Time slot */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">Pickup Window</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="min-w-0">
-                    <span className="block text-xs text-text-tertiary mb-1">From</span>
-                    <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-12 px-2 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+              {/* Date + Time in a card */}
+              <div className="bg-surface border border-border rounded-2xl p-4 space-y-4">
+                {/* Quick-select date chips */}
+                <div>
+                  <label className="block text-xs font-bold text-text-tertiary uppercase tracking-wider mb-2">Pickup Date</label>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {(() => {
+                      const chips: { label: string; sub: string; value: string }[] = [];
+                      for (let d = 0; d < 7; d++) {
+                        const date = new Date();
+                        date.setDate(date.getDate() + d);
+                        const value = date.toISOString().split('T')[0];
+                        const label = d === 0 ? 'Today' : d === 1 ? 'Tmrw' : date.toLocaleDateString('en-US', { weekday: 'short' });
+                        const sub = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        chips.push({ label, sub, value });
+                      }
+                      return chips.map((chip) => (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          onClick={() => setSchedule({ ...schedule, date: chip.value })}
+                          className={cn(
+                            'flex-shrink-0 w-16 py-2 rounded-xl text-center transition-all border',
+                            schedule.date === chip.value
+                              ? 'bg-brand text-white border-brand shadow-brand'
+                              : 'bg-surface-secondary border-transparent text-text-primary hover:border-brand/40'
+                          )}
+                        >
+                          <span className="block text-xs font-bold">{chip.label}</span>
+                          <span className={cn('block text-[10px] mt-0.5', schedule.date === chip.value ? 'text-white/80' : 'text-text-tertiary')}>{chip.sub}</span>
+                        </button>
+                      ));
+                    })()}
                   </div>
-                  <div className="min-w-0">
-                    <span className="block text-xs text-text-tertiary mb-1">To</span>
-                    <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-12 px-2 sm:px-4 bg-surface border border-border rounded-xl text-text-primary text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                </div>
+
+                {/* Or pick from calendar */}
+                <div>
+                  <label className="block text-xs text-text-tertiary mb-1">Or pick a date</label>
+                  <input
+                    type="date"
+                    value={schedule.date}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
+                    className="w-full h-11 px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all"
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border" />
+
+                {/* Time slot */}
+                <div>
+                  <label className="block text-xs font-bold text-text-tertiary uppercase tracking-wider mb-2">Pickup Window</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <span className="block text-xs text-text-secondary mb-1">From</span>
+                      <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-xs text-text-secondary mb-1">To</span>
+                      <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -475,7 +488,7 @@ function OrderFlowInner() {
                       <Calendar className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-text-primary">
+                      <p className="text-sm font-semibold text-text-primary truncate">
                         {new Date(schedule.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                       </p>
                       <p className="text-xs text-text-secondary">{schedule.from} &ndash; {schedule.to}</p>

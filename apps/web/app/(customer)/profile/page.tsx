@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, MapPin, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Sun, Share2, Bell, Mail, Phone } from 'lucide-react';
+import { User, MapPin, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Sun, Share2, Bell, Mail, Phone, Pencil } from 'lucide-react';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -28,13 +30,34 @@ const menuSections = [
 export default function ProfilePage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const token = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleSaveProfile = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      await api.updateProfile(token, { name: editName, email: editEmail || undefined });
+      updateUser({ name: editName, email: editEmail || undefined });
+      toast.success('Profile updated');
+      setEditing(false);
+    } catch {
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -53,22 +76,64 @@ export default function ProfilePage() {
         <div className="space-y-4">
           {/* Profile Header */}
           <div className="bg-surface border border-border rounded-2xl p-5">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-2xl font-black text-white shadow-lg">
-                {user?.name?.charAt(0) || <User className="w-7 h-7" />}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-black text-text-primary">{user?.name || 'Set up profile'}</h2>
-                <p className="text-sm text-text-secondary flex items-center gap-1.5 mt-0.5">
-                  <Phone className="w-3 h-3" /> {user?.phone}
-                </p>
-                {user?.email && (
-                  <p className="text-xs text-text-tertiary flex items-center gap-1.5 mt-0.5">
-                    <Mail className="w-3 h-3" /> {user.email}
+            {!editing ? (
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-2xl font-black text-white shadow-lg flex-shrink-0">
+                  {user?.name?.charAt(0) || <User className="w-7 h-7" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-black text-text-primary truncate">{user?.name || 'Set up profile'}</h2>
+                  <p className="text-sm text-text-secondary flex items-center gap-1.5 mt-0.5">
+                    <Phone className="w-3 h-3 flex-shrink-0" /> {user?.phone}
                   </p>
-                )}
+                  {user?.email ? (
+                    <p className="text-xs text-text-tertiary flex items-center gap-1.5 mt-0.5">
+                      <Mail className="w-3 h-3 flex-shrink-0" /> {user.email}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  onClick={() => { setEditName(user?.name || ''); setEditEmail(user?.email || ''); setEditing(true); }}
+                  className="p-2 rounded-xl bg-brand-light text-brand hover:bg-brand hover:text-white transition-colors flex-shrink-0"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-bold text-text-primary">Edit Profile</span>
+                  <button onClick={() => setEditing(false)} className="text-xs text-text-tertiary hover:text-text-primary transition-colors">Cancel</button>
+                </div>
+                <div>
+                  <label className="block text-xs text-text-tertiary mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full h-10 px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand focus:outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-tertiary mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full h-10 px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand focus:outline-none transition-all"
+                  />
+                </div>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={saving || !editName.trim()}
+                  className="w-full h-10 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand-hover transition-all disabled:opacity-40 flex items-center justify-center"
+                >
+                  {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Save'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Theme Toggle */}
