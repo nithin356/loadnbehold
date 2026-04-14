@@ -247,9 +247,32 @@ function OrderFlowInner() {
     return true;
   };
 
+  const [scheduleError, setScheduleError] = useState('');
+
+  const validateSchedule = (): boolean => {
+    if (!schedule.date) { setScheduleError('Please select a date'); return false; }
+    if (!schedule.from || !schedule.to) { setScheduleError('Please select a time window'); return false; }
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    if (schedule.date < today) { setScheduleError('Cannot schedule for a past date'); return false; }
+
+    if (schedule.to <= schedule.from) { setScheduleError('"To" time must be after "From" time'); return false; }
+
+    if (schedule.date === today) {
+      const [fromH, fromM] = schedule.from.split(':').map(Number);
+      const fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), fromH, fromM);
+      if (fromDate <= now) { setScheduleError('Pickup time must be in the future'); return false; }
+    }
+
+    setScheduleError('');
+    return true;
+  };
+
   const canProceed = () => {
     if (step === 0) return items.length > 0;
-    if (step === 1) return schedule.date !== '';
+    if (step === 1) return schedule.date !== '' && schedule.from !== '' && schedule.to !== '';
     if (step === 2) return address.line1 !== '' && address.city !== '' && address.zip !== '' && addressServiceable !== false && !checkingServiceability;
     return true;
   };
@@ -433,7 +456,7 @@ function OrderFlowInner() {
                         <button
                           key={chip.value}
                           type="button"
-                          onClick={() => setSchedule({ ...schedule, date: chip.value })}
+                          onClick={() => { setSchedule({ ...schedule, date: chip.value }); setScheduleError(''); }}
                           className={cn(
                             'flex-shrink-0 w-16 py-2 rounded-xl text-center transition-all border',
                             schedule.date === chip.value
@@ -456,7 +479,7 @@ function OrderFlowInner() {
                     type="date"
                     value={schedule.date}
                     min={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
+                    onChange={(e) => { setSchedule({ ...schedule, date: e.target.value }); setScheduleError(''); }}
                     className="w-full max-w-full h-11 px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none [&::-webkit-date-and-time-value]:text-left"
                   />
                 </div>
@@ -470,18 +493,26 @@ function OrderFlowInner() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="min-w-0 overflow-hidden">
                       <span className="block text-xs text-text-secondary mb-1">From</span>
-                      <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
+                      <input type="time" value={schedule.from} onChange={(e) => { setSchedule({ ...schedule, from: e.target.value }); setScheduleError(''); }} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
                     </div>
                     <div className="min-w-0 overflow-hidden">
                       <span className="block text-xs text-text-secondary mb-1">To</span>
-                      <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
+                      <input type="time" value={schedule.to} onChange={(e) => { setSchedule({ ...schedule, to: e.target.value }); setScheduleError(''); }} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Validation error */}
+              {scheduleError && (
+                <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/30 rounded-xl">
+                  <AlertTriangle className="w-4 h-4 text-error flex-shrink-0" />
+                  <span className="text-sm text-error font-medium">{scheduleError}</span>
+                </div>
+              )}
+
               {/* Summary card */}
-              {schedule.date && (
+              {schedule.date && !scheduleError && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-brand-light/50 border border-brand/20 rounded-xl">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center flex-shrink-0">
@@ -888,7 +919,9 @@ function OrderFlowInner() {
           {step < 4 ? (
             <button
               onClick={() => {
+                if (step === 1 && !validateSchedule()) return;
                 if (step === 2 && !validateAddressFields()) return;
+                setScheduleError('');
                 setStep(step + 1);
               }}
               disabled={!canProceed()}
