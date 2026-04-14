@@ -25,13 +25,19 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
   const userId = req.user!.userId;
   const { items, pickupAddress, deliveryAddress, schedule, paymentMethod, promoCode, tip: requestedTip } = req.body;
 
-  // Validate schedule is not in the past
+  // Validate schedule is not in the past and has minimum lead time
   if (schedule?.pickupSlot) {
     const { date, from } = schedule.pickupSlot;
     if (date && from) {
       const pickupTime = new Date(`${date}T${from}:00`);
-      if (pickupTime < new Date()) {
+      const now = new Date();
+      if (pickupTime < now) {
         sendError(res, 'SCHEDULE_PAST', 'Pickup time is in the past. Please select a future time.', 400);
+        return;
+      }
+      const minLeadMs = 60 * 60 * 1000; // 1 hour
+      if (pickupTime.getTime() - now.getTime() < minLeadMs) {
+        sendError(res, 'SCHEDULE_TOO_SOON', 'Pickup must be at least 1 hour from now.', 400);
         return;
       }
     }

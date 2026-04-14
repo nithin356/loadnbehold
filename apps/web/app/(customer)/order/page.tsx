@@ -249,6 +249,8 @@ function OrderFlowInner() {
 
   const [scheduleError, setScheduleError] = useState('');
 
+  const MIN_LEAD_MINUTES = 60; // Minimum 1 hour before pickup
+
   const validateSchedule = (): boolean => {
     if (!schedule.date) { setScheduleError('Please select a date'); return false; }
     if (!schedule.from || !schedule.to) { setScheduleError('Please select a time window'); return false; }
@@ -264,6 +266,11 @@ function OrderFlowInner() {
       const [fromH, fromM] = schedule.from.split(':').map(Number);
       const fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), fromH, fromM);
       if (fromDate <= now) { setScheduleError('Pickup time must be in the future'); return false; }
+      const minLeadTime = new Date(now.getTime() + MIN_LEAD_MINUTES * 60 * 1000);
+      if (fromDate < minLeadTime) {
+        setScheduleError(`Pickup must be at least ${MIN_LEAD_MINUTES} minutes from now`);
+        return false;
+      }
     }
 
     setScheduleError('');

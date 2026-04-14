@@ -192,7 +192,8 @@ export default function CheckoutScreen() {
     if (!selectedAddress) return;
 
     // Re-validate schedule at submission time
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
     if (pickupDate < today) {
       Alert.alert('Schedule Expired', 'Your pickup date is now in the past. Please go back and select a new date.');
       setStep(2);
@@ -201,10 +202,15 @@ export default function CheckoutScreen() {
     if (pickupDate === today) {
       const slot = parseTimeSlot(pickupSlot, pickupDate);
       const [h, m] = slot.from.split(':').map(Number);
-      const slotStart = new Date();
-      slotStart.setHours(h, m, 0, 0);
-      if (slotStart <= new Date()) {
+      const slotStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+      const minLeadTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour lead
+      if (slotStart <= now) {
         Alert.alert('Schedule Expired', 'Your selected pickup time has already passed. Please go back and pick a later slot.');
+        setStep(2);
+        return;
+      }
+      if (slotStart < minLeadTime) {
+        Alert.alert('Too Soon', 'Pickup must be at least 1 hour from now. Please select a later time slot.');
         setStep(2);
         return;
       }
