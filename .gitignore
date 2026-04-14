@@ -13,4 +13,5 @@ coverage/
 *serviceAccountKey*
 *firebase-service-account*
 google-services.json
+!apps/mobile/google-services.json
 api data.txt
