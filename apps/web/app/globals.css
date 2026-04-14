@@ -114,6 +114,26 @@ body {
   100% { background-position: 200% 0; }
 }
 
+/* ─── iOS Date/Time Input Fix ─────────────────────────── */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Hide scrollbar for date chip containers */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* ─── Focus Ring ────────────────────────────────────────── */
 *:focus-visible {
   outline: 2px solid var(--brand);

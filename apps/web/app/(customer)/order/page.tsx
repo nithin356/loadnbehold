@@ -457,7 +457,7 @@ function OrderFlowInner() {
                     value={schedule.date}
                     min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
-                    className="w-full h-11 px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all"
+                    className="w-full max-w-full h-11 px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none [&::-webkit-date-and-time-value]:text-left"
                   />
                 </div>
 
@@ -468,13 +468,13 @@ function OrderFlowInner() {
                 <div>
                   <label className="block text-xs font-bold text-text-tertiary uppercase tracking-wider mb-2">Pickup Window</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 overflow-hidden">
                       <span className="block text-xs text-text-secondary mb-1">From</span>
-                      <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                      <input type="time" value={schedule.from} onChange={(e) => setSchedule({ ...schedule, from: e.target.value })} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 overflow-hidden">
                       <span className="block text-xs text-text-secondary mb-1">To</span>
-                      <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-sm text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all" />
+                      <input type="time" value={schedule.to} onChange={(e) => setSchedule({ ...schedule, to: e.target.value })} className="w-full max-w-full h-11 px-2 sm:px-3 bg-surface-secondary border border-border rounded-xl text-base text-text-primary focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all appearance-none" />
                     </div>
                   </div>
                 </div>
