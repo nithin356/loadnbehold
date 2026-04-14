@@ -10,6 +10,7 @@ import { StripeProvider } from '@/lib/stripe';
 import { useAuthStore } from '@/lib/store';
 import { customerApi } from '@/lib/api';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Toaster } from 'sonner-native';
 import { router } from 'expo-router';
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
@@ -115,6 +116,7 @@ export default function RootLayout() {
             <Stack.Screen name="(driver)" />
             <Stack.Screen name="index" />
           </Stack>
+          <Toaster position="top-center" />
         </StripeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

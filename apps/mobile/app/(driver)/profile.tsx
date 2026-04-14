@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Linking, Appearance, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Appearance, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/store';
 import { driverApi } from '@/lib/api';
 
@@ -24,13 +26,14 @@ export default function DriverProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
       const data = await driverApi.getProfile();
       setProfile(data);
     } catch {
-      Alert.alert('Error', 'Failed to load profile');
+      toast.error('Failed to load profile');
     } finally {
       setLoading(false);
     }
@@ -53,18 +56,14 @@ export default function DriverProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          logout();
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
+    setLogoutConfirmVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutConfirmVisible(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    logout();
+    router.replace('/(auth)/login');
   };
 
   if (loading) {
@@ -79,9 +78,9 @@ export default function DriverProfileScreen() {
     {
       title: 'Account',
       items: [
-        { icon: 'car-outline', label: 'Vehicle Info', subtitle: profile?.vehicle?.make ? `${profile.vehicle.year} ${profile.vehicle.make} ${profile.vehicle.model}` : 'Not set', onPress: () => Alert.alert('Vehicle Info', 'Contact support to update your vehicle information.') },
-        { icon: 'document-text-outline', label: 'Documents', subtitle: 'License, insurance, registration', onPress: () => Alert.alert('Documents', 'Contact support to update your documents.') },
-        { icon: 'card-outline', label: 'Bank Account', subtitle: 'Payout details', onPress: () => Alert.alert('Bank Account', 'Contact support to update your bank details.') },
+        { icon: 'car-outline', label: 'Vehicle Info', subtitle: profile?.vehicle?.make ? `${profile.vehicle.year} ${profile.vehicle.make} ${profile.vehicle.model}` : 'Not set', onPress: () => toast.info('Contact support to update your vehicle information.') },
+        { icon: 'document-text-outline', label: 'Documents', subtitle: 'License, insurance, registration', onPress: () => toast.info('Contact support to update your documents.') },
+        { icon: 'card-outline', label: 'Bank Account', subtitle: 'Payout details', onPress: () => toast.info('Contact support to update your bank details.') },
       ],
     },
     {
@@ -196,6 +195,16 @@ export default function DriverProfileScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={logoutConfirmVisible}
+        title="Log Out"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log Out"
+        destructive
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutConfirmVisible(false)}
+      />
     </SafeAreaView>
   );
 }

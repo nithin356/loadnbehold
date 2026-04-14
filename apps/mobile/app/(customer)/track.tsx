@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Platform } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -209,7 +210,7 @@ export default function TrackScreen() {
       const data = await ordersApi.track(orderId);
       setOrder(data);
     } catch {
-      Alert.alert('Error', 'Failed to load tracking data');
+      toast.error('Failed to load tracking data');
     } finally {
       setLoading(false);
     }

@@ -231,7 +231,7 @@ export async function getBanners(_req: Request, res: Response): Promise<void> {
       sendSuccess(res, [
         { title: 'First Order 20% OFF', description: 'Use code FIRST20', deepLink: '/orders', color: '#2563EB' },
         { title: 'Free Delivery on $50+', description: 'Limited time offer', deepLink: '/orders', color: '#7C3AED' },
-        { title: 'Refer & Earn $10', description: 'Share with friends', deepLink: '/referral', color: '#059669' },
+        { title: 'Refer & Earn $5', description: 'Share with friends', deepLink: '/referral', color: '#059669' },
       ]);
       return;
     }

@@ -60,6 +60,19 @@ function VerifyForm() {
     try {
       const result: any = await api.verifyOtp(phone, code);
       login(result.data.user, result.data.accessToken, result.data.refreshToken);
+
+      // Auto-apply pending referral code from /invite deep link
+      const pendingRef = localStorage.getItem('loadnbehold-referral');
+      if (pendingRef) {
+        localStorage.removeItem('loadnbehold-referral');
+        try {
+          const refResult: any = await api.applyReferralCode(result.data.accessToken, pendingRef);
+          toast.success(refResult.data?.message || 'Referral code applied!');
+        } catch {
+          // Silently ignore — user may have already used a code or isn't eligible
+        }
+      }
+
       toast.success('Welcome to LoadNBehold!');
       router.push('/home');
     } catch (err: any) {

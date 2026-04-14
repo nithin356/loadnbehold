@@ -216,6 +216,9 @@ export const api = {
   applyReferralCode: (token: string, code: string) =>
     fetchApi('/referral/apply', { method: 'POST', token, body: JSON.stringify({ code }) }),
 
+  getReferralHistory: (token: string) =>
+    fetchApi('/referral/history', { token }),
+
   // Payments
   createPaymentIntent: (token: string, orderId: string, amount: number, opts?: { saveCard?: boolean; savedPaymentMethodId?: string }) =>
     fetchApi('/payments/create-intent', { method: 'POST', token, body: JSON.stringify({ orderId, amount, ...opts }) }),

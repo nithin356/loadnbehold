@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -129,7 +130,7 @@ export default function CheckoutScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to detect your address.');
+        toast.error('Location permission is required to detect your address');
         setLocLoading(false);
         return;
       }
@@ -154,7 +155,7 @@ export default function CheckoutScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err: any) {
-      Alert.alert('Location Error', err.message || 'Could not detect your location');
+      toast.error(err.message || 'Could not detect your location');
     }
     setLocLoading(false);
   };
@@ -195,7 +196,7 @@ export default function CheckoutScreen() {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     if (pickupDate < today) {
-      Alert.alert('Schedule Expired', 'Your pickup date is now in the past. Please go back and select a new date.');
+      toast.error('Your pickup date is now in the past. Please select a new date.');
       setStep(2);
       return;
     }
@@ -205,12 +206,12 @@ export default function CheckoutScreen() {
       const slotStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
       const minLeadTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour lead
       if (slotStart <= now) {
-        Alert.alert('Schedule Expired', 'Your selected pickup time has already passed. Please go back and pick a later slot.');
+        toast.error('Your selected pickup time has already passed. Please pick a later slot.');
         setStep(2);
         return;
       }
       if (slotStart < minLeadTime) {
-        Alert.alert('Too Soon', 'Pickup must be at least 1 hour from now. Please select a later time slot.');
+        toast.error('Pickup must be at least 1 hour from now. Please select a later time slot.');
         setStep(2);
         return;
       }
@@ -256,11 +257,10 @@ export default function CheckoutScreen() {
       await ordersApi.create(orderData);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       cart.clearCart();
-      Alert.alert('Order Placed!', 'Your order has been placed successfully.', [
-        { text: 'View Orders', onPress: () => router.replace('/(customer)/orders') },
-      ]);
+      toast.success('Your order has been placed successfully!');
+      router.replace('/(customer)/orders');
     } catch (err: any) {
-      Alert.alert('Order Failed', err.message || 'Failed to place order. Please try again.');
+      toast.error(err.message || 'Failed to place order. Please try again.');
     }
     setPlacing(false);
   };

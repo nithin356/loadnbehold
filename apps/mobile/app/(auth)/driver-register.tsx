@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Button } from '@/components/Button';
@@ -30,11 +31,11 @@ export default function DriverRegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!name.trim()) return Alert.alert('Required', 'Enter your full name');
-    if (!make.trim()) return Alert.alert('Required', 'Enter vehicle make');
-    if (!model.trim()) return Alert.alert('Required', 'Enter vehicle model');
-    if (!plate.trim()) return Alert.alert('Required', 'Enter license plate');
-    if (!color.trim()) return Alert.alert('Required', 'Enter vehicle color');
+    if (!name.trim()) { toast.error('Enter your full name'); return; }
+    if (!make.trim()) { toast.error('Enter vehicle make'); return; }
+    if (!model.trim()) { toast.error('Enter vehicle model'); return; }
+    if (!plate.trim()) { toast.error('Enter license plate'); return; }
+    if (!color.trim()) { toast.error('Enter vehicle color'); return; }
 
     setLoading(true);
     try {
@@ -56,13 +57,10 @@ export default function DriverRegisterScreen() {
       // Update local user role so routing works
       setUser({ ...user!, name: name.trim(), role: 'driver' });
 
-      Alert.alert(
-        'Registration Submitted',
-        'Your driver profile is pending approval. You can start accepting orders once approved.',
-        [{ text: 'OK', onPress: () => router.replace('/') }]
-      );
+      toast.success('Registration submitted! Your profile is pending approval.');
+      router.replace('/');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Registration failed');
+      toast.error(err.message || 'Registration failed');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);

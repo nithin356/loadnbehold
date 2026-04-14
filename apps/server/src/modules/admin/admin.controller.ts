@@ -9,6 +9,7 @@ import { AppConfig } from '../../models/AppConfig';
 import { AuditLog } from '../../models/AuditLog';
 import { Service } from '../../models/Service';
 import { creditToWallet } from '../wallet/wallet.controller';
+import { processReferralReward } from '../referral/referral.controller';
 import { queues } from '../../jobs/queue';
 import { sendSuccess, sendError, sendPaginated } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
@@ -155,6 +156,11 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
   if (!order) {
     sendError(res, 'NOT_FOUND', 'Order not found', 404);
     return;
+  }
+
+  // Credit referral rewards if admin marked order as delivered
+  if (req.body.status === 'delivered') {
+    processReferralReward(order.customerId.toString()).catch(() => {});
   }
 
   await logAudit(req, 'order.updated', 'order', order._id.toString());

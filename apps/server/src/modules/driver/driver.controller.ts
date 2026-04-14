@@ -6,6 +6,7 @@ import { Transaction } from '../../models/Transaction';
 import { redis, redisAvailable } from '../../config/redis';
 import { sendOrderStatusNotification } from '../../services/notification.service';
 import { sendOrderStatusUpdate } from '../../services/email.service';
+import { processReferralReward } from '../referral/referral.controller';
 import { uploadFile } from '../../services/storage.service';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
@@ -271,6 +272,9 @@ export async function updateOrderStatus(req: Request, res: Response): Promise<vo
     }
 
     await driver.save();
+
+    // Credit referral rewards on first delivered order
+    processReferralReward(order.customerId.toString()).catch(() => {});
   }
 
   await order.save();

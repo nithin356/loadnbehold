@@ -129,6 +129,18 @@ export const customerApi = {
     }),
 };
 
+// ─── Referrals ────────────────────────────────
+export const referralApi = {
+  getCode: () =>
+    request<{ code: string; referralCount: number; bonusPerReferral: number; totalEarned: number }>('/referral/code'),
+
+  apply: (code: string) =>
+    request<{ bonusReceived: number; message: string }>('/referral/apply', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+};
+
 // ─── Orders ────────────────────────────────────
 export const ordersApi = {
   create: (data: any) =>

@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator,
-  Alert, Modal, TextInput, Share, Animated, Easing, RefreshControl, Platform,
+  Modal, TextInput, Share, Animated, Easing, RefreshControl, Platform,
 } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ordersApi } from '@/lib/api';
 import { ORDER_STATUSES, ORDER_STATUS_LABELS } from '@loadnbehold/constants';
 
@@ -126,6 +128,7 @@ export default function OrdersScreen() {
   const [cancelOrder, setCancelOrder] = useState<OrderItem | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [submittingCancel, setSubmittingCancel] = useState(false);
+  const [reorderTarget, setReorderTarget] = useState<OrderItem | null>(null);
 
   useEffect(() => { loadOrders(); }, []);
 
@@ -134,7 +137,7 @@ export default function OrdersScreen() {
       const data = await ordersApi.list();
       setOrders(Array.isArray(data) ? data : data?.items || []);
     } catch {
-      Alert.alert('Error', 'Failed to load orders');
+      toast.error('Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -175,7 +178,7 @@ export default function OrdersScreen() {
       setRatingOrder(null);
       loadOrders();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit rating');
+      toast.error(err.message || 'Failed to submit rating');
     } finally {
       setSubmittingRating(false);
     }
@@ -189,39 +192,38 @@ export default function OrdersScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCancelOrder(null);
       setCancelReason('');
-      const refundMsg = result?.refundAmount > 0 ? `\nRefund: $${result.refundAmount.toFixed(2)} to wallet` : '';
-      const feeMsg = result?.fee > 0 ? `\nCancellation fee: $${result.fee.toFixed(2)}` : '';
-      Alert.alert('Order Cancelled', `Your order has been cancelled.${refundMsg}${feeMsg}`);
+      const refundMsg = result?.refundAmount > 0 ? ` Refund: $${result.refundAmount.toFixed(2)} to wallet.` : '';
+      const feeMsg = result?.fee > 0 ? ` Cancellation fee: $${result.fee.toFixed(2)}.` : '';
+      toast.success(`Order cancelled.${refundMsg}${feeMsg}`);
       loadOrders();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to cancel order');
+      toast.error(err.message || 'Failed to cancel order');
     } finally {
       setSubmittingCancel(false);
     }
   };
 
   const handleReorder = (order: OrderItem) => {
-    Alert.alert('Reorder', `Place the same order as ${order.orderNumber}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reorder',
-        onPress: async () => {
-          try {
-            await ordersApi.reorder(order._id);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Success', 'Reorder placed successfully!');
-            loadOrders();
-          } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to reorder');
-          }
-        },
-      },
-    ]);
+    setReorderTarget(order);
+  };
+
+  const confirmReorder = async () => {
+    if (!reorderTarget) return;
+    const order = reorderTarget;
+    setReorderTarget(null);
+    try {
+      await ordersApi.reorder(order._id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success('Reorder placed successfully!');
+      loadOrders();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reorder');
+    }
   };
 
   const handleDispute = async () => {
     if (!disputeOrder || !disputeReason.trim()) {
-      Alert.alert('Required', 'Please describe the issue.');
+      toast.error('Please describe the issue');
       return;
     }
     setSubmittingDispute(true);
@@ -230,9 +232,9 @@ export default function OrdersScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setDisputeOrder(null);
       setDisputeReason('');
-      Alert.alert('Submitted', 'Your dispute has been filed. Our team will review it shortly.');
+      toast.success('Your dispute has been filed. Our team will review it shortly.');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to file dispute');
+      toast.error(err.message || 'Failed to file dispute');
     } finally {
       setSubmittingDispute(false);
     }
@@ -244,12 +246,12 @@ export default function OrdersScreen() {
       const text = `Invoice: ${invoice.invoiceNumber}\nOrder: ${invoice.order.orderNumber}\nTotal: $${invoice.order.pricing.total.toFixed(2)}\nDate: ${new Date(invoice.date).toLocaleDateString()}`;
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(text);
-        Alert.alert('Copied', 'Invoice details copied to clipboard.');
+        toast.success('Invoice details copied to clipboard');
       } else {
         await Share.share({ message: text, title: `Invoice ${invoice.invoiceNumber}` });
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to get invoice');
+      toast.error(err.message || 'Failed to get invoice');
     }
   };
 
@@ -800,6 +802,15 @@ export default function OrdersScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!reorderTarget}
+        title="Reorder"
+        message={`Place the same order as ${reorderTarget?.orderNumber}?`}
+        confirmLabel="Reorder"
+        onConfirm={confirmReorder}
+        onCancel={() => setReorderTarget(null)}
+      />
     </SafeAreaView>
   );
 }

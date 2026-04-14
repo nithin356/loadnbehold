@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Switch, TouchableOpacity, Alert, RefreshControl, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, RefreshControl, Modal, ActivityIndicator } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,7 +46,7 @@ export default function DriverDashboard() {
       if (profile) setDriverProfile(profile);
       setAssignedOrders(Array.isArray(orders) ? orders : []);
     } catch {
-      Alert.alert('Error', 'Failed to load dashboard data');
+      toast.error('Failed to load dashboard data');
     }
   }, []);
 
@@ -81,7 +82,7 @@ export default function DriverDashboard() {
       setIncomingOrder(null);
       loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to accept order');
+      toast.error(err.message || 'Failed to accept order');
     } finally {
       setRespondingToOrder(false);
     }
@@ -95,7 +96,7 @@ export default function DriverDashboard() {
       setIncomingOrder(null);
       loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to reject order');
+      toast.error(err.message || 'Failed to reject order');
     } finally {
       setRespondingToOrder(false);
     }
@@ -117,7 +118,7 @@ export default function DriverDashboard() {
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Location permission is needed to go online.');
+        toast.error('Location permission is needed to go online');
         return;
       }
 
@@ -132,7 +133,7 @@ export default function DriverDashboard() {
           setDriverProfile(profile);
           driverId = profile._id;
         } catch {
-          Alert.alert('Error', 'Could not load driver profile');
+          toast.error('Could not load driver profile');
           return;
         }
       }
@@ -141,7 +142,7 @@ export default function DriverDashboard() {
       try {
         await driverApi.toggleStatus();
       } catch {
-        Alert.alert('Warning', 'Could not update online status on server');
+        toast.warning('Could not update online status on server');
       }
 
       // Start location tracking AFTER socket is connected
@@ -177,7 +178,7 @@ export default function DriverDashboard() {
       try {
         await driverApi.toggleStatus();
       } catch {
-        Alert.alert('Warning', 'Could not update offline status on server');
+        toast.warning('Could not update offline status on server');
       }
       disconnectSocket();
     }

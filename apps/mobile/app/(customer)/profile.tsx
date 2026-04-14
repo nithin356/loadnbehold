@@ -1,13 +1,15 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, Share, Modal, TextInput, ActivityIndicator, Appearance, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, Share, Modal, TextInput, ActivityIndicator, Appearance, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/store';
-import { customerApi } from '@/lib/api';
+import { customerApi, referralApi } from '@/lib/api';
 
 interface MenuItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -27,6 +29,10 @@ export default function ProfileScreen() {
   const [editEmail, setEditEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [referralModalVisible, setReferralModalVisible] = useState(false);
+  const [referralInput, setReferralInput] = useState('');
+  const [applyingReferral, setApplyingReferral] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -46,7 +52,7 @@ export default function ProfileScreen() {
   const handleSaveProfile = async () => {
     const trimmedName = editName.trim();
     if (!trimmedName) {
-      Alert.alert('Validation', 'Name cannot be empty');
+      toast.error('Name cannot be empty');
       return;
     }
     setSaving(true);
@@ -58,38 +64,55 @@ export default function ProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setEditModalVisible(false);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update profile');
+      toast.error(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          logout();
-          router.replace('/');
-        },
-      },
-    ]);
+    setLogoutConfirmVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutConfirmVisible(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    logout();
+    router.replace('/');
+  };
+
+  const handleApplyReferral = async () => {
+    const code = referralInput.trim().toUpperCase();
+    if (!code) {
+      toast.error('Please enter a referral code');
+      return;
+    }
+    setApplyingReferral(true);
+    try {
+      const result = await referralApi.apply(code);
+      toast.success(result.message);
+      setReferralModalVisible(false);
+      setReferralInput('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to apply referral code');
+    } finally {
+      setApplyingReferral(false);
+    }
   };
 
   const handleReferral = async () => {
-    const msg = `Join LoadNBehold and get your laundry done! Use my referral link to sign up and we both earn $10. Download now: https://loadnbehold.com/invite`;
     try {
+      const data = await referralApi.getCode();
+      const code = data.code;
+      const msg = `Join LoadNBehold and get your laundry done! Use my referral link to sign up and we both earn $5. Download now: https://loadnbehold.com/invite?ref=${code}`;
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(msg);
-        Alert.alert('Copied', 'Referral link copied to clipboard.');
+        toast.success('Referral link copied to clipboard');
       } else {
         await Share.share({ message: msg });
       }
     } catch {
-      // user cancelled share
+      // user cancelled share or failed to fetch code
     }
   };
 
@@ -107,7 +130,7 @@ export default function ProfileScreen() {
       items: [
         { icon: 'location-outline', label: 'Saved Addresses', subtitle: 'Manage your addresses', onPress: () => router.push('/(customer)/addresses') },
         { icon: 'card-outline', label: 'Payment Methods', subtitle: 'Cards and wallet', onPress: () => router.push('/(customer)/wallet') },
-        { icon: 'people-outline', label: 'Family Members', subtitle: 'Manage family accounts', onPress: () => Alert.alert('Family Members', 'Family sharing is available with Plus and Premium plans. Upgrade your subscription to add family members.') },
+        { icon: 'people-outline', label: 'Family Members', subtitle: 'Manage family accounts', onPress: () => toast.info('Family sharing is available with Plus and Premium plans. Upgrade your subscription to add family members.') },
       ],
     },
     {
@@ -123,7 +146,8 @@ export default function ProfileScreen() {
       items: [
         { icon: 'help-circle-outline', label: 'Help Center', subtitle: 'FAQs and guides', onPress: () => Linking.openURL('https://loadnbehold.com/faq') },
         { icon: 'chatbubble-outline', label: 'Support Tickets', subtitle: 'View or create tickets', onPress: () => router.push('/(customer)/support') },
-        { icon: 'share-social-outline', label: 'Refer a Friend', subtitle: 'Earn $10 for each referral', onPress: handleReferral },
+        { icon: 'share-social-outline', label: 'Refer a Friend', subtitle: 'Earn $5 for each referral', onPress: handleReferral },
+        { icon: 'gift-outline', label: 'Apply Referral Code', subtitle: 'Enter a code from a friend', onPress: () => setReferralModalVisible(true) },
       ],
     },
     {
@@ -317,6 +341,75 @@ export default function ProfileScreen() {
         </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Referral Code Modal */}
+      <Modal visible={referralModalVisible} transparent animationType="slide" onRequestClose={() => setReferralModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl }}>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: c.textPrimary, marginBottom: spacing.sm }}>
+              Apply Referral Code
+            </Text>
+            <Text style={{ fontSize: fontSize.sm, color: c.textSecondary, marginBottom: spacing.lg }}>
+              Enter the code your friend shared with you. You'll both earn $5 after your first order is delivered!
+            </Text>
+            <TextInput
+              value={referralInput}
+              onChangeText={setReferralInput}
+              placeholder="e.g. JOHN20"
+              placeholderTextColor={c.textTertiary}
+              autoCapitalize="characters"
+              style={{
+                backgroundColor: c.surfaceSecondary,
+                borderRadius: radius.lg,
+                padding: spacing.lg,
+                fontSize: fontSize.base,
+                color: c.textPrimary,
+                fontWeight: '600',
+                letterSpacing: 1,
+                marginBottom: spacing.lg,
+                borderWidth: 1,
+                borderColor: c.border,
+              }}
+            />
+            <TouchableOpacity
+              onPress={handleApplyReferral}
+              disabled={applyingReferral}
+              style={{
+                backgroundColor: c.brand,
+                borderRadius: radius.lg,
+                padding: spacing.lg,
+                alignItems: 'center',
+                opacity: applyingReferral ? 0.6 : 1,
+                marginBottom: spacing.sm,
+              }}
+            >
+              {applyingReferral ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.base }}>Apply Code</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setReferralModalVisible(false); setReferralInput(''); }}
+              style={{ padding: spacing.md, alignItems: 'center' }}
+            >
+              <Text style={{ color: c.textSecondary, fontSize: fontSize.base }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <ConfirmDialog
+        visible={logoutConfirmVisible}
+        title="Logout"
+        message="Are you sure you want to log out?"
+        confirmLabel="Logout"
+        destructive
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutConfirmVisible(false)}
+      />
     </SafeAreaView>
   );
 }

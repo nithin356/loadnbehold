@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform, Linking, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Linking, RefreshControl } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/lib/haptics';
 import { useConfirmPayment } from '@/lib/stripe';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { WalletSkeleton } from '@/components/Skeleton';
 import { walletApi, paymentApi } from '@/lib/api';
 import { WALLET_TOPUP_AMOUNTS } from '@loadnbehold/constants';
@@ -30,6 +32,7 @@ export default function WalletScreen() {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteCardTarget, setDeleteCardTarget] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -49,7 +52,7 @@ export default function WalletScreen() {
       const defaultMethod = methods.find((m: any) => m.isDefault);
       if (defaultMethod) setSelectedMethodId(defaultMethod._id);
     } catch {
-      Alert.alert('Error', 'Failed to load wallet data');
+      toast.error('Failed to load wallet data');
     } finally {
       setLoading(false);
     }
@@ -67,15 +70,15 @@ export default function WalletScreen() {
   const handleTopUp = async () => {
     const amount = getTopUpAmount();
     if (!amount) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount (minimum $1)');
+      toast.error('Please enter a valid amount (minimum $1)');
       return;
     }
     if (amount > 10_000) {
-      Alert.alert('Limit Exceeded', 'Maximum top-up amount is $10,000');
+      toast.error('Maximum top-up amount is $10,000');
       return;
     }
     if ((balance ?? 0) + amount > 10_000) {
-      Alert.alert('Limit Exceeded', 'Wallet balance cannot exceed $10,000');
+      toast.error('Wallet balance cannot exceed $10,000');
       return;
     }
 
@@ -97,7 +100,7 @@ export default function WalletScreen() {
           paymentMethodType: 'Card',
         });
         if (error) {
-          Alert.alert('Payment Failed', error.message || 'Card confirmation failed');
+          toast.error(error.message || 'Card confirmation failed');
           setTopUpLoading(false);
           return;
         }
@@ -112,10 +115,10 @@ export default function WalletScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSelectedAmount(null);
       setCustomAmount('');
-      Alert.alert('Success', `$${amount.toFixed(2)} added to your wallet!`);
+      toast.success(`$${amount.toFixed(2)} added to your wallet!`);
       loadData();
     } catch (err: any) {
-      Alert.alert('Payment Failed', err.message || 'Failed to process payment. Please try again.');
+      toast.error(err.message || 'Failed to process payment. Please try again.');
     } finally {
       setTopUpLoading(false);
     }
@@ -132,22 +135,20 @@ export default function WalletScreen() {
   };
 
   const handleDeleteCard = (id: string) => {
-    Alert.alert('Remove Card', 'Are you sure you want to remove this card?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await paymentApi.deleteSavedMethod(id);
-            setSavedMethods((prev) => prev.filter((m) => m._id !== id));
-            if (selectedMethodId === id) setSelectedMethodId(null);
-          } catch {
-            Alert.alert('Error', 'Failed to remove card');
-          }
-        },
-      },
-    ]);
+    setDeleteCardTarget(id);
+  };
+
+  const confirmDeleteCard = async () => {
+    if (!deleteCardTarget) return;
+    const id = deleteCardTarget;
+    setDeleteCardTarget(null);
+    try {
+      await paymentApi.deleteSavedMethod(id);
+      setSavedMethods((prev) => prev.filter((m) => m._id !== id));
+      if (selectedMethodId === id) setSelectedMethodId(null);
+    } catch {
+      toast.error('Failed to remove card');
+    }
   };
 
   if (loading) {
@@ -433,6 +434,16 @@ export default function WalletScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={!!deleteCardTarget}
+        title="Remove Card"
+        message="Are you sure you want to remove this card?"
+        confirmLabel="Remove"
+        destructive
+        onConfirm={confirmDeleteCard}
+        onCancel={() => setDeleteCardTarget(null)}
+      />
     </SafeAreaView>
   );
 }

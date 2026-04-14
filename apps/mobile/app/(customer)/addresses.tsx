@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Platform, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
 import * as Location from '@/lib/location';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { customerApi } from '@/lib/api';
 import { useLocationStore } from '@/lib/store';
 
@@ -29,6 +31,7 @@ export default function AddressesScreen() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Form state
   const [label, setLabel] = useState('Home');
@@ -48,7 +51,7 @@ export default function AddressesScreen() {
       const data = await customerApi.getAddresses();
       setAddresses(Array.isArray(data) ? data : []);
     } catch {
-      Alert.alert('Error', 'Failed to load addresses');
+      toast.error('Failed to load addresses');
     }
     setLoading(false);
   };
@@ -73,7 +76,7 @@ export default function AddressesScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access is required.');
+        toast.error('Location access is required');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -89,23 +92,23 @@ export default function AddressesScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
-      Alert.alert('Error', 'Could not detect location');
+      toast.error('Could not detect location');
     }
   };
 
   const saveAddress = async () => {
     if (!line1.trim() || !city.trim() || !state.trim() || !zip.trim()) {
-      Alert.alert('Missing Fields', 'Please fill in all address fields.');
+      toast.error('Please fill in all address fields');
       return;
     }
     const trimmedState = state.trim().toUpperCase();
     if (trimmedState.length !== 2) {
-      Alert.alert('Invalid State', 'State must be a 2-letter code (e.g., MI, CA, NY).');
+      toast.error('State must be a 2-letter code (e.g., MI, CA, NY)');
       return;
     }
     const trimmedZip = zip.trim();
     if (!/^\d{5}(-\d{4})?$/.test(trimmedZip)) {
-      Alert.alert('Invalid ZIP', 'Enter a valid 5-digit ZIP code.');
+      toast.error('Enter a valid 5-digit ZIP code');
       return;
     }
     setSaving(true);
@@ -125,27 +128,25 @@ export default function AddressesScreen() {
       resetForm();
       loadAddresses();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save address');
+      toast.error(err.message || 'Failed to save address');
     }
     setSaving(false);
   };
 
   const deleteAddress = (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await customerApi.deleteAddress(id);
-            setAddresses((prev) => prev.filter((a) => a._id !== id));
-          } catch {
-            Alert.alert('Error', 'Failed to delete address');
-          }
-        },
-      },
-    ]);
+    setDeleteTarget(id);
+  };
+
+  const confirmDeleteAddress = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
+    try {
+      await customerApi.deleteAddress(id);
+      setAddresses((prev) => prev.filter((a) => a._id !== id));
+    } catch {
+      toast.error('Failed to delete address');
+    }
   };
 
   if (loading) {
@@ -262,6 +263,16 @@ export default function AddressesScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         )}
+      />
+
+      <ConfirmDialog
+        visible={!!deleteTarget}
+        title="Delete Address"
+        message="Are you sure you want to delete this address?"
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteAddress}
+        onCancel={() => setDeleteTarget(null)}
       />
     </SafeAreaView>
   );

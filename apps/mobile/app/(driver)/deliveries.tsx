@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,7 +44,7 @@ export default function DeliveriesScreen() {
       setActiveOrders(Array.isArray(active) ? active : []);
       setCompletedOrders(Array.isArray(completed) ? completed : []);
     } catch {
-      Alert.alert('Error', 'Failed to load deliveries');
+      toast.error('Failed to load deliveries');
     } finally {
       setLoading(false);
     }

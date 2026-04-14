@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/lib/haptics';
@@ -38,7 +39,7 @@ export default function EarningsScreen() {
       const res = await driverApi.getEarnings();
       setData(res);
     } catch {
-      Alert.alert('Error', 'Failed to load earnings');
+      toast.error('Failed to load earnings');
     } finally {
       setLoading(false);
     }
@@ -55,11 +56,11 @@ export default function EarningsScreen() {
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Invalid Amount', 'Enter a valid deposit amount.');
+      toast.error('Enter a valid deposit amount');
       return;
     }
     if (amount > cashBalance) {
-      Alert.alert('Exceeds Balance', `You only have $${cashBalance.toFixed(2)} cash on hand.`);
+      toast.error(`You only have $${cashBalance.toFixed(2)} cash on hand`);
       return;
     }
     setDepositing(true);
@@ -70,7 +71,7 @@ export default function EarningsScreen() {
       setDepositAmount('');
       await loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to deposit cash');
+      toast.error(err.message || 'Failed to deposit cash');
     } finally {
       setDepositing(false);
     }
@@ -82,7 +83,7 @@ export default function EarningsScreen() {
       setTaxSummary(res);
       setShowTaxSummary(true);
     } catch {
-      Alert.alert('Error', 'Failed to load tax summary');
+      toast.error('Failed to load tax summary');
     }
   };
 

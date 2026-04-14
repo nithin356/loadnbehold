@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
 import * as Haptics from '@/lib/haptics';
 import { useThemeColors, spacing, fontSize, radius } from '@/lib/theme';
 import { Card } from '@/components/Card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { StatusBadge } from '@/components/StatusBadge';
 import { driverApi } from '@/lib/api';
 import { ORDER_STATUS_LABELS } from '@loadnbehold/constants';
@@ -40,6 +42,7 @@ export default function DriverOrderDetail() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusConfirmVisible, setStatusConfirmVisible] = useState(false);
 
   const loadOrder = useCallback(async () => {
     if (!id) {
@@ -52,7 +55,7 @@ export default function DriverOrderDetail() {
       const found = (orders || []).find((o: any) => o._id === id);
       if (found) setOrder(found);
     } catch {
-      Alert.alert('Error', 'Failed to load order details');
+      toast.error('Failed to load order details');
     }
     setLoading(false);
   }, [id]);
@@ -65,32 +68,27 @@ export default function DriverOrderDetail() {
     setRefreshing(false);
   };
 
-  const handleAdvanceStatus = async () => {
+  const handleAdvanceStatus = () => {
     if (!order || !id) return;
     const flow = DRIVER_STATUS_FLOW[order.status];
     if (!flow) return;
+    setStatusConfirmVisible(true);
+  };
 
-    Alert.alert(
-      flow.label,
-      `Update order to "${ORDER_STATUS_LABELS[flow.next] || flow.next}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            setUpdating(true);
-            try {
-              await driverApi.updateOrderStatus(id, flow.next);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              await loadOrder();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to update status');
-            }
-            setUpdating(false);
-          },
-        },
-      ]
-    );
+  const confirmAdvanceStatus = async () => {
+    setStatusConfirmVisible(false);
+    if (!order || !id) return;
+    const flow = DRIVER_STATUS_FLOW[order.status];
+    if (!flow) return;
+    setUpdating(true);
+    try {
+      await driverApi.updateOrderStatus(id, flow.next);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await loadOrder();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status');
+    }
+    setUpdating(false);
   };
 
   const handleCall = (phone: string) => {
@@ -396,6 +394,15 @@ export default function DriverOrderDetail() {
           </TouchableOpacity>
         </View>
       )}
+
+      <ConfirmDialog
+        visible={statusConfirmVisible}
+        title={DRIVER_STATUS_FLOW[order?.status]?.label || 'Update Status'}
+        message={`Update order to "${ORDER_STATUS_LABELS[DRIVER_STATUS_FLOW[order?.status]?.next] || ''}"?`}
+        confirmLabel="Confirm"
+        onConfirm={confirmAdvanceStatus}
+        onCancel={() => setStatusConfirmVisible(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { toast } from 'sonner-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,7 +67,7 @@ export default function SupportScreen() {
       const data = await supportApi.getTicket(ticketId);
       setSelectedTicket(data);
     } catch {
-      Alert.alert('Error', 'Failed to load ticket');
+      toast.error('Failed to load ticket');
       setView('list');
     } finally {
       setLoadingDetail(false);
@@ -75,20 +76,20 @@ export default function SupportScreen() {
 
   const handleCreate = async () => {
     if (!subject.trim() || !message.trim()) {
-      Alert.alert('Missing Fields', 'Subject and message are required');
+      toast.error('Subject and message are required');
       return;
     }
     setCreating(true);
     try {
       await supportApi.createTicket({ subject: subject.trim(), category, message: message.trim() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', 'Ticket created');
+      toast.success('Ticket created');
       setSubject('');
       setMessage('');
       setView('list');
       fetchTickets();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to create ticket');
+      toast.error(err.message || 'Failed to create ticket');
     } finally {
       setCreating(false);
     }
@@ -105,7 +106,7 @@ export default function SupportScreen() {
       const updated = await supportApi.getTicket(selectedTicket._id);
       setSelectedTicket(updated);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to send reply');
+      toast.error(err.message || 'Failed to send reply');
     } finally {
       setSending(false);
     }

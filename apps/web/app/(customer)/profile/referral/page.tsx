@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Share2, Copy, Users, DollarSign, ChevronLeft, Check } from 'lucide-react';
+import { Share2, Copy, Users, DollarSign, ChevronLeft, Check, Clock, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -9,14 +9,23 @@ import { toast } from 'sonner';
 
 interface ReferralData {
   code: string;
-  totalReferrals: number;
-  totalEarnings: number;
+  referralCount: number;
+  bonusPerReferral: number;
+  totalEarned: number;
+}
+
+interface ReferralHistoryItem {
+  name: string;
+  phone: string;
+  joinedAt: string;
+  status: 'completed' | 'pending';
 }
 
 export default function ReferralPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.accessToken);
   const [referralData, setReferralData] = useState<ReferralData | null>(null);
+  const [history, setHistory] = useState<ReferralHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -29,12 +38,12 @@ export default function ReferralPage() {
 
     try {
       setLoading(true);
-      const response: any = await api.getReferralCode(token);
-      setReferralData({
-        code: response.data?.code || '',
-        totalReferrals: response.data?.totalReferrals || 0,
-        totalEarnings: response.data?.totalEarnings || 0,
-      });
+      const [codeRes, historyRes]: any[] = await Promise.all([
+        api.getReferralCode(token),
+        api.getReferralHistory(token),
+      ]);
+      setReferralData(codeRes.data);
+      setHistory(historyRes.data || []);
     } catch (err: any) {
       toast.error('Failed to load referral data');
     } finally {
@@ -121,7 +130,7 @@ export default function ReferralPage() {
             <span className="text-xs font-medium">Total Referrals</span>
           </div>
           <p className="text-2xl font-bold text-text-primary">
-            {loading ? '...' : referralData?.totalReferrals || 0}
+            {loading ? '...' : referralData?.referralCount || 0}
           </p>
         </div>
 
@@ -131,10 +140,45 @@ export default function ReferralPage() {
             <span className="text-xs font-medium">Earnings</span>
           </div>
           <p className="text-2xl font-bold text-text-primary">
-            {loading ? '...' : `$${(referralData?.totalEarnings || 0).toFixed(2)}`}
+            {loading ? '...' : `$${(referralData?.totalEarned || 0).toFixed(2)}`}
           </p>
         </div>
       </div>
+
+      {/* Referral History */}
+      {history.length > 0 && (
+        <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+          <h3 className="font-medium text-text-primary mb-3">Referral History</h3>
+          <div className="space-y-3">
+            {history.map((item, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-surface-secondary flex items-center justify-center">
+                    <Users className="w-4 h-4 text-text-tertiary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{item.name}</p>
+                    <p className="text-xs text-text-tertiary">{item.phone}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {item.status === 'completed' ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-xs font-medium text-green-600">Earned ${referralData?.bonusPerReferral || 5}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-medium text-amber-600">Pending</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* How It Works */}
       <div className="bg-surface border border-border rounded-lg p-4 mb-6">

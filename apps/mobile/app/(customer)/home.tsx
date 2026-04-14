@@ -16,7 +16,7 @@ import { SERVICES } from '@loadnbehold/constants';
 const FALLBACK_BANNERS = [
   { id: '1', title: 'First Order 20% OFF', description: 'Use code FIRST20', color: '#2563EB' },
   { id: '2', title: 'Free Delivery on $50+', description: 'Limited time offer', color: '#7C3AED' },
-  { id: '3', title: 'Refer & Earn $10', description: 'Share with friends', color: '#059669' },
+  { id: '3', title: 'Refer & Earn $5', description: 'Share with friends', color: '#059669' },
 ];
 
 const serviceIcons: Record<string, string> = {
