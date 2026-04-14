@@ -19,7 +19,7 @@ export interface ISavedPaymentMethod extends Document {
 
 const savedPaymentMethodSchema = new Schema<ISavedPaymentMethod>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     gateway: { type: String, enum: ['stripe', 'square', 'paypal'], required: true },
     gatewayPaymentMethodId: { type: String, required: true },
     type: { type: String, enum: ['card', 'bank_account', 'paypal'], default: 'card' },

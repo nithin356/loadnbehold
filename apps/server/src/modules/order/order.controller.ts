@@ -474,29 +474,52 @@ export async function reorder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Create new order based on original
+  // Re-check current prices (don't copy stale pricing from original order)
+  const config = await AppConfig.findOne({ key: 'global' });
+  const taxRate = config?.taxRate || 6.0;
+  const deliveryFeeConfig = config?.deliveryFee || { base: 4.99, perMile: 0.5, freeAbove: 50 };
+
+  const basePricesMap: Record<string, number> = {};
+  const dbServices = await Service.find({ isActive: true }).lean();
+  if (dbServices.length > 0) {
+    for (const svc of dbServices) basePricesMap[svc.key] = svc.basePrice;
+  } else {
+    for (const svc of DEFAULT_SERVICES) basePricesMap[svc.key] = svc.basePrice;
+  }
+
+  const reorderItems = original.items.map((item: any) => {
+    const currentPrice = basePricesMap[item.service] || item.price || 5;
+    return {
+      service: item.service,
+      quantity: item.quantity,
+      weight: item.weight,
+      unit: item.unit,
+      price: currentPrice,
+      specialInstructions: item.specialInstructions,
+    };
+  });
+
+  const subtotal = reorderItems.reduce((sum: number, i: any) => sum + i.quantity * (i.unit === 'lbs' ? (i.weight || 1) : 1) * i.price, 0);
+  const deliveryFee = subtotal >= deliveryFeeConfig.freeAbove ? 0 : deliveryFeeConfig.base;
+  const tax = parseFloat(((subtotal * taxRate) / 100).toFixed(2));
+  const total = parseFloat((subtotal + deliveryFee + tax).toFixed(2));
+
   const newOrder = await Order.create({
     orderNumber: generateOrderNumber(),
     customerId: userId,
     outletId: original.outletId,
     status: 'placed',
-    items: original.items.map((item: any) => ({
-      service: item.service,
-      quantity: item.quantity,
-      weight: item.weight,
-      unit: item.unit,
-      specialInstructions: item.specialInstructions,
-    })),
+    items: reorderItems,
     pickupAddress: original.pickupAddress,
     deliveryAddress: original.deliveryAddress,
-    pricing: original.pricing,
+    pricing: { subtotal, deliveryFee, tax, discount: 0, surcharge: 0, tip: 0, total },
     paymentMethod: original.paymentMethod,
     payment: {
       gateway: original.payment.gateway,
       status: 'pending',
       codAmount: 0,
       walletAmount: 0,
-      onlineAmount: original.pricing.total,
+      onlineAmount: total,
       codCollectedByDriver: false,
     },
     timeline: [{ status: 'placed', timestamp: new Date() }],

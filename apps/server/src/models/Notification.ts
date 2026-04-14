@@ -15,7 +15,7 @@ export interface INotification extends Document {
 
 const notificationSchema = new Schema<INotification>(
   {
-    recipientId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    recipientId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: ['push', 'sms', 'email'], required: true },
     channel: { type: String, enum: ['order_status', 'promotional', 'system', 'reminder'], required: true },
     title: { type: String, required: true },

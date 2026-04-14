@@ -3,12 +3,14 @@ import * as ctrl from './admin.controller';
 import { authenticate } from '../../middleware/auth';
 import { requireRole, requireAdminRole } from '../../middleware/roleGuard';
 import { validate } from '../../middleware/validator';
+import { adminLimiter } from '../../middleware/rateLimiter';
 import { createOutletSchema, createOfferSchema, createBannerSchema, sendNotificationSchema } from '@loadnbehold/validators';
 
 const router: Router = Router();
 
 router.use(authenticate);
 router.use(requireRole('admin'));
+router.use(adminLimiter);
 
 // Dashboard
 router.get('/dashboard', ctrl.getDashboardStats);

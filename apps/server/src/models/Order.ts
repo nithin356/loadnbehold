@@ -116,8 +116,8 @@ const addressSubSchema = {
 const orderSchema = new Schema<IOrder>(
   {
     orderNumber: { type: String, required: true, unique: true },
-    customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    driverId: { type: Schema.Types.ObjectId, ref: 'Driver', index: true },
+    customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
     outletId: { type: Schema.Types.ObjectId, ref: 'Outlet', required: true },
     rejectedDrivers: [{ type: Schema.Types.ObjectId, ref: 'Driver' }],
     status: {
@@ -128,7 +128,6 @@ const orderSchema = new Schema<IOrder>(
         'out_for_delivery', 'delivered', 'cancelled',
       ],
       default: 'placed',
-      index: true,
     },
     items: [
       {
@@ -227,7 +226,7 @@ const orderSchema = new Schema<IOrder>(
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ driverId: 1, status: 1 });
 orderSchema.index({ outletId: 1, status: 1 });
-orderSchema.index({ orderNumber: 1 });
+// orderNumber already indexed via unique: true
 orderSchema.index({ 'schedule.pickupSlot.date': 1, outletId: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);

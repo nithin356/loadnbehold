@@ -12,7 +12,7 @@ export interface IWalletTransaction extends Document {
 
 const walletTransactionSchema = new Schema<IWalletTransaction>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: {
       type: String,
       enum: ['topup', 'payment', 'refund', 'credit', 'debit', 'referral'],

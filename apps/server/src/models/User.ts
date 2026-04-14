@@ -71,7 +71,7 @@ const addressSubSchema = new Schema(
 
 const userSchema = new Schema<IUser>(
   {
-    phone: { type: String, required: true, unique: true, index: true },
+    phone: { type: String, required: true, unique: true },
     name: { type: String, default: '' },
     email: { type: String, sparse: true },
     role: { type: String, enum: ['customer', 'driver', 'admin'], default: 'customer' },
@@ -124,7 +124,6 @@ const userSchema = new Schema<IUser>(
 
 // Geospatial index on addresses
 userSchema.index({ 'addresses.location': '2dsphere' });
-userSchema.index({ phone: 1 });
-userSchema.index({ referralCode: 1 });
+// phone and referralCode already indexed via unique: true
 
 export const User = mongoose.model<IUser>('User', userSchema);

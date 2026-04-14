@@ -29,6 +29,20 @@ export const authLimiter = rateLimit({
   },
 });
 
+export const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: 'ADMIN_RATE_LIMIT',
+      message: 'Too many admin requests, please slow down',
+    },
+  },
+});
+
 export const otpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,

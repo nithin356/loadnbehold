@@ -26,5 +26,13 @@ jobs:
       - name: Type check
         run: pnpm turbo type-check
 
+      - name: Build
+        run: pnpm turbo build
+
       - name: Run server tests
         run: pnpm --filter @loadnbehold/server test
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/loadnbehold_test
+          JWT_ACCESS_SECRET: ci-test-secret
+          JWT_REFRESH_SECRET: ci-test-refresh-secret

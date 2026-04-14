@@ -28,10 +28,14 @@ export const useAdminAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
-      login: (user, accessToken, refreshToken) =>
-        set({ user, accessToken, refreshToken, isAuthenticated: true }),
-      logout: () =>
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
+      login: (user, accessToken, refreshToken) => {
+        set({ user, accessToken, refreshToken, isAuthenticated: true });
+        document.cookie = 'loadnbehold-admin-auth=1; path=/; max-age=2592000; SameSite=Lax';
+      },
+      logout: () => {
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+        document.cookie = 'loadnbehold-admin-auth=; path=/; max-age=0';
+      },
     }),
     { name: 'loadnbehold-admin-auth' }
   )

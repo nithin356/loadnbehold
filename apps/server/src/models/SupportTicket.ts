@@ -30,7 +30,7 @@ export interface ISupportTicket extends Document {
 const supportTicketSchema = new Schema<ISupportTicket>(
   {
     ticketNumber: { type: String, unique: true, sparse: true },
-    customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
     category: {
       type: String,
@@ -81,7 +81,8 @@ supportTicketSchema.pre('save', function (next) {
   next();
 });
 
+supportTicketSchema.index({ customerId: 1, status: 1 });
 supportTicketSchema.index({ status: 1, priority: -1, slaDeadline: 1 });
-supportTicketSchema.index({ ticketNumber: 1 });
+// ticketNumber already indexed via unique: true
 
 export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', supportTicketSchema);
